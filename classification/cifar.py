@@ -1,5 +1,4 @@
 import os
-from random import shuffle
 import pickle
 import numpy as np
 
@@ -37,28 +36,17 @@ def cifar(base_dir, phase, version=10):
             images.extend(dict[b"data"])
             labels.extend(dict[b"fine_labels"])
 
-    image_idx = [x for x in range(len(images))]
+    def gen(skip_n=1, offset=0):
+        for idx in range(offset, len(images), skip_n):
+            img = np.reshape(images[idx], (3, 32, 32))
+            yield (img.transpose((1, 2, 0)), labels[idx])
 
-    images_per_class = {}
-    for label in labels:
-        if str(label) not in images_per_class:
-            images_per_class[str(label)] = 0
-        images_per_class[str(label)] += 1
-
-    def gen():
-        while True:
-            # Shuffle data
-            shuffle(image_idx)
-            for idx in image_idx:
-                img = np.reshape(images[idx], (3, 32, 32))
-                yield (img.transpose((1, 2, 0)), labels[idx])
-
-    return gen()
+    return gen
 
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    train_data = cifar("data/cifar-10", "train")
+    train_data = cifar("data/cifar-10", "train")()
 
     img, label = next(train_data)
     print("Image shape:")

@@ -57,22 +57,18 @@ def named_folders(base_dir, phase, prepare_features=None, class_idx={}, crop_roi
         with open(os.path.join(classes_dir, "labels.json"), 'w') as outfile:
             json.dump(labels, outfile)
 
-    image_idx = [x for x in range(len(images))]
     n_classes = len(classes)
 
-    def gen():
-        while True:
-            # Shuffle data
-            shuffle(image_idx)
-            for idx in image_idx:
-                feature = imread(images[idx], mode="RGB")
-                if crop_roi is not None:
-                    feature = crop_center(feature, crop_roi[0], crop_roi[1])
-                if prepare_features:
-                    feature = prepare_features(feature)
-                yield (feature, one_hot(labels[idx], n_classes))
+    def gen(skip_n=1, offset=0):
+        for idx in range(offset, len(images), skip_n):
+            feature = imread(images[idx], mode="RGB")
+            if crop_roi is not None:
+                feature = crop_center(feature, crop_roi[0], crop_roi[1])
+            if prepare_features:
+                feature = prepare_features(feature)
+            yield (feature, one_hot(labels[idx], n_classes))
 
-    return gen()
+    return gen
 
 
 if __name__ == "__main__":
@@ -80,7 +76,7 @@ if __name__ == "__main__":
 
     print("Loading Dataset:")
     roi = (200, 200)
-    train_data = named_folders("data/lfw-deepfunneled", phase=None, crop_roi=roi, file_extension=".jpg")
+    train_data = named_folders("data/lfw-deepfunneled", phase=None, crop_roi=roi, file_extension=".jpg")()
 
     img, label = next(train_data)
     print("Image shape:")
