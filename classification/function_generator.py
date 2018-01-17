@@ -7,7 +7,7 @@ import math
 
 
 def one_hot(idx, max_idx):
-    label = np.zeros(max_idx)
+    label = np.zeros(max_idx, dtype=np.uint8)
     label[idx] = 1
     return label
 
@@ -22,7 +22,7 @@ def function_generator(functions, sequence_length, num_datapoints, prepare_featu
             label_idx = randint(0, num_functions - 1)
             offset = random()
             selected_function = functions[label_idx]
-            feature = [selected_function(i, offset) for i in range(sequence_length)]
+            feature = np.array([selected_function(i, offset) for i in range(sequence_length)], dtype=np.float32)
             if prepare_features:
                 feature = prepare_features(feature)
             yield feature, one_hot(label_idx, num_functions)

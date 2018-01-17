@@ -6,7 +6,7 @@ import json
 
 
 def one_hot(idx, max_idx):
-    label = np.zeros(max_idx)
+    label = np.zeros(max_idx, dtype=np.uint8)
     label[idx] = 1
     return label
 
