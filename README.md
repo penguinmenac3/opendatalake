@@ -1,4 +1,4 @@
-## Datasets
+## Datasets [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Since it is all about data, this are data wrappers for common datasets which load the data into a common structure.
 
