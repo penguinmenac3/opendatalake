@@ -36,10 +36,13 @@ def cifar(base_dir, phase, version=10):
             images.extend(dict[b"data"])
             labels.extend(dict[b"fine_labels"])
 
-    def gen(skip_n=1, offset=0):
-        for idx in range(offset, len(images), skip_n):
-            img = np.reshape(images[idx], (3, 32, 32))
-            yield (img.transpose((1, 2, 0)), labels[idx])
+    def gen(skip_n=1, offset=0, infinite=False):
+        loop_condition = True
+        while loop_condition:
+            for idx in range(offset, len(images), skip_n):
+                img = np.reshape(images[idx], (3, 32, 32))
+                yield (img.transpose((1, 2, 0)), labels[idx])
+            loop_condition = infinite
 
     return gen
 

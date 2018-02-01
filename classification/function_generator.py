@@ -17,15 +17,18 @@ def function_generator(functions, sequence_length, num_datapoints, prepare_featu
     labels = []
     num_functions = len(functions)
 
-    def gen(skip_n=1, offset=0):
-        for idx in range(offset, num_datapoints, skip_n):
-            label_idx = randint(0, num_functions - 1)
-            offset = random()
-            selected_function = functions[label_idx]
-            feature = np.array([selected_function(i, offset) for i in range(sequence_length)], dtype=np.float32)
-            if prepare_features:
-                feature = prepare_features(feature)
-            yield feature, one_hot(label_idx, num_functions)
+    def gen(skip_n=1, offset=0, infinite=False):
+        loop_condition = True
+        while loop_condition:
+            for idx in range(offset, num_datapoints, skip_n):
+                label_idx = randint(0, num_functions - 1)
+                offset = random()
+                selected_function = functions[label_idx]
+                feature = np.array([selected_function(i, offset) for i in range(sequence_length)], dtype=np.float32)
+                if prepare_features:
+                    feature = prepare_features(feature)
+                yield feature, one_hot(label_idx, num_functions)
+            loop_condition = infinite
 
     return gen
 

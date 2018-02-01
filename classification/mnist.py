@@ -14,9 +14,12 @@ def mnist(base_dir, phase, prepare_features=None):
     if prepare_features is not None:
         images = prepare_features(images)
 
-    def gen(skip_n=1, offset=0):
-        for idx in range(offset, len(images), skip_n):
-            yield (images[idx], labels[idx])
+    def gen(skip_n=1, offset=0, infinite=False):
+        loop_condition = True
+        while loop_condition:
+            for idx in range(offset, len(images), skip_n):
+                yield (images[idx], labels[idx])
+            loop_condition = infinite
 
     return gen
 
