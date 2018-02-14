@@ -19,6 +19,27 @@ def crop_center(img,cropy,cropx):
     return img[starty:starty+cropy, startx:startx+cropx, :]
 
 
+def _gen(params, skip_n=1, offset=0, infinite=False):
+    images, no_split_folder, phase, crop_roi, prepare_features, labels, n_classes = params
+
+    loop_condition = True
+    while loop_condition:
+        for idx in range(offset, len(images), skip_n):
+            if no_split_folder and idx % no_split_folder == 0 and phase == PHASE_TRAIN:
+                continue
+
+            if no_split_folder and idx % no_split_folder != 0 and phase == PHASE_VALIDATION:
+                continue
+
+            feature = imread(images[idx], mode="RGB")
+            if crop_roi is not None:
+                feature = crop_center(feature, crop_roi[0], crop_roi[1])
+            if prepare_features:
+                feature = prepare_features(feature)
+            yield (feature, one_hot(labels[idx], n_classes))
+        loop_condition = infinite
+
+
 def named_folders(base_dir, phase, prepare_features=None, class_idx={}, crop_roi=None, file_extension=".png", overwrite_cache=False, no_split_folder=False):
     if no_split_folder:
         classes_dir = base_dir
@@ -58,25 +79,7 @@ def named_folders(base_dir, phase, prepare_features=None, class_idx={}, crop_roi
 
     n_classes = len(classes)
 
-    def gen(skip_n=1, offset=0, infinite=False):
-        loop_condition = True
-        while loop_condition:
-            for idx in range(offset, len(images), skip_n):
-                if no_split_folder and idx % no_split_folder == 0 and phase == PHASE_TRAIN:
-                    continue
-
-                if no_split_folder and idx % no_split_folder != 0 and phase == PHASE_VALIDATION:
-                    continue
-
-                feature = imread(images[idx], mode="RGB")
-                if crop_roi is not None:
-                    feature = crop_center(feature, crop_roi[0], crop_roi[1])
-                if prepare_features:
-                    feature = prepare_features(feature)
-                yield (feature, one_hot(labels[idx], n_classes))
-            loop_condition = infinite
-
-    return gen
+    return _gen, (images, no_split_folder, phase, crop_roi, prepare_features, labels, n_classes)
 
 
 if __name__ == "__main__":
@@ -84,12 +87,15 @@ if __name__ == "__main__":
 
     print("Loading Dataset:")
     roi = (200, 200)
-    train_data = named_folders("data/lfw-deepfunneled", phase=None, crop_roi=roi, file_extension=".jpg")()
+    train_data = named_folders("data/lfw-deepfunneled", phase=None, crop_roi=roi, file_extension=".jpg")
 
-    img, label = next(train_data)
+    data_fn, data_params = train_data
+    data_gen = data_fn(data_params)
+
+    img, label = next(data_gen)
     print("Image shape:")
     print(img.shape)
 
-    for img, label in train_data:
+    for img, label in data_gen:
         plt.imshow(img)
         plt.show()

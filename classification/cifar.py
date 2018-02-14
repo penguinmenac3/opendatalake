@@ -11,6 +11,17 @@ CIFAR_100_DOWNLOAD = "https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz"
 # For cifar-100 the data/cifar-100 folder should contain a train and a test file.
 
 
+def _gen(params, skip_n=1, offset=0, infinite=False):
+    images, labels = params
+
+    loop_condition = True
+    while loop_condition:
+        for idx in range(offset, len(images), skip_n):
+            img = np.reshape(images[idx], (3, 32, 32))
+            yield (img.transpose((1, 2, 0)), labels[idx])
+        loop_condition = infinite
+
+
 def cifar(base_dir, phase, version=10):
     images = []
     labels = []
@@ -36,25 +47,20 @@ def cifar(base_dir, phase, version=10):
             images.extend(dict[b"data"])
             labels.extend(dict[b"fine_labels"])
 
-    def gen(skip_n=1, offset=0, infinite=False):
-        loop_condition = True
-        while loop_condition:
-            for idx in range(offset, len(images), skip_n):
-                img = np.reshape(images[idx], (3, 32, 32))
-                yield (img.transpose((1, 2, 0)), labels[idx])
-            loop_condition = infinite
-
-    return gen
+    return _gen, (images, labels)
 
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
-    train_data = cifar("data/cifar-10", "train")()
+    train_data = cifar("data/cifar-10", "train")
 
-    img, label = next(train_data)
+    data_fn, data_params = train_data
+    data_gen = data_fn(data_params)
+
+    img, label = next(data_gen)
     print("Image shape:")
     print(img.shape)
 
-    for img, label in train_data:
+    for img, label in data_gen:
         plt.imshow(img)
         plt.show()

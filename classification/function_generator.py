@@ -12,33 +12,36 @@ def one_hot(idx, max_idx):
     return label
 
 
-def function_generator(functions, sequence_length, num_datapoints, prepare_features=None):
-    features = []
-    labels = []
+def _gen(params, skip_n=1, offset=0, infinite=False):
+    functions, sequence_length, num_datapoints, prepare_features = params
+
     num_functions = len(functions)
+    loop_condition = True
+    while loop_condition:
+        for idx in range(offset, num_datapoints, skip_n):
+            label_idx = randint(0, num_functions - 1)
+            offset = random()
+            selected_function = functions[label_idx]
+            feature = np.array([selected_function(i, offset) for i in range(sequence_length)], dtype=np.float32)
+            if prepare_features:
+                feature = prepare_features(feature)
+            yield feature, one_hot(label_idx, num_functions)
+        loop_condition = infinite
 
-    def gen(skip_n=1, offset=0, infinite=False):
-        loop_condition = True
-        while loop_condition:
-            for idx in range(offset, num_datapoints, skip_n):
-                label_idx = randint(0, num_functions - 1)
-                offset = random()
-                selected_function = functions[label_idx]
-                feature = np.array([selected_function(i, offset) for i in range(sequence_length)], dtype=np.float32)
-                if prepare_features:
-                    feature = prepare_features(feature)
-                yield feature, one_hot(label_idx, num_functions)
-            loop_condition = infinite
 
-    return gen
+def function_generator(functions, sequence_length, num_datapoints, prepare_features=None):
+    return _gen, (functions, sequence_length, num_datapoints, prepare_features)
 
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     print("Loading Dataset:")
-    train_data = function_generator([lambda x, off: math.sin(x / 50.0 + off), lambda x, off: x / 50.0 + off], 100, 10)()
+    train_data = function_generator([lambda x, off: math.sin(x / 50.0 + off), lambda x, off: x / 50.0 + off], 100, 10)
 
-    for feature, label in train_data:
+    data_fn, data_params = train_data
+    data_gen = data_fn(data_params)
+
+    for feature, label in data_gen:
         plt.plot(feature)
         plt.show()

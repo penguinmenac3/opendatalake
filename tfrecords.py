@@ -17,7 +17,8 @@ def _bytes_feature(value):
 
 def _write_tf_record_pool_helper(args):
     data, num_threads, i, record_filename, preprocess_feature, preprocess_label = args
-    _write_tf_record(data(num_threads, i), record_filename, preprocess_feature, preprocess_label)
+    data_fn, data_params = data
+    _write_tf_record(data_fn(data_params, num_threads, i), record_filename, preprocess_feature, preprocess_label)
 
 
 def _write_tf_record(data, record_filename, preprocess_feature=None, preprocess_label=None):
@@ -90,7 +91,10 @@ def write_tf_records(output_folder,
     args_train = [(train_data, num_threads_train, i, os.path.join(output_folder, PHASE_TRAIN + "_%d.tfrecords" % i ), preprocess_feature, preprocess_label) for i in range(num_threads_train)]
     args_validation = [(validation_data, num_threads_validation, i, os.path.join(output_folder, PHASE_VALIDATION + "_%d.tfrecords" % i ), preprocess_feature, preprocess_label) for i in range(num_threads_validation)]
 
-    sample_feature, sample_label = next(train_data())
+    # Retrieve a single sample
+    data_fn, data_params = train_data
+    data_gen = data_fn(data_params)
+    sample_feature, sample_label = next(data_gen)
 
     config = {"num_threads_" + PHASE_TRAIN: num_threads_train, "num_threads_" + PHASE_VALIDATION: num_threads_validation,
               "feature_shape": sample_feature.shape, "label_shape": sample_label.shape,
@@ -99,8 +103,8 @@ def write_tf_records(output_folder,
     with open(os.path.join(output_folder, 'config.json'), 'w') as outfile:
         json.dump(config, outfile)
 
-    for arg in args_train + args_validation:
-        _write_tf_record_pool_helper(arg)
+    #for arg in args_train + args_validation:
+    #    _write_tf_record_pool_helper(arg)
     
-    #pool = Pool(processes=(num_threads_train + num_threads_validation))
-    #pool.map(_write_tf_record_pool_helper, args_train + args_validation)
+    pool = Pool(processes=(num_threads_train + num_threads_validation))
+    pool.map(_write_tf_record_pool_helper, args_train + args_validation)

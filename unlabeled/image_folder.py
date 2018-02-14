@@ -12,6 +12,23 @@ def crop_center(img,cropy,cropx):
     return img[starty:starty+cropy, startx:startx+cropx, :]
 
 
+def _gen(params, skip_n=1, offset=0, infinite=False):
+    images, crop_roi, prepare_features, add_noise = params
+    loop_condition = True
+    while loop_condition:
+        for idx in range(offset, len(images), skip_n):
+            feature = imread(images[idx], mode="RGB")
+            if crop_roi is not None:
+                feature = crop_center(feature, crop_roi[0], crop_roi[1])
+            if prepare_features:
+                feature = prepare_features(feature)
+            noisy_feature = feature
+            if add_noise:
+                pass  # TODO add noise
+            yield (noisy_feature, feature)
+        loop_condition = infinite
+
+
 def image_folder(base_dir, phase, prepare_features=None, crop_roi=None, file_extension=".png", overwrite_cache=False, add_noise=False):
     if phase is not None:
         data_dir = os.path.join(base_dir, phase)
@@ -36,22 +53,7 @@ def image_folder(base_dir, phase, prepare_features=None, crop_roi=None, file_ext
         with open(os.path.join(data_dir, "images.json"), 'w') as outfile:
             json.dump(images, outfile)
 
-    def gen(skip_n=1, offset=0, infinite=False):
-        loop_condition = True
-        while loop_condition:
-            for idx in range(offset, len(images), skip_n):
-                feature = imread(images[idx], mode="RGB")
-                if crop_roi is not None:
-                    feature = crop_center(feature, crop_roi[0], crop_roi[1])
-                if prepare_features:
-                    feature = prepare_features(feature)
-                noisy_feature = feature
-                if add_noise:
-                    pass  # TODO add noise
-                yield (noisy_feature, feature)
-            loop_condition = infinite
-
-    return gen
+    return _gen, (images, crop_roi, prepare_features, add_noise)
 
 
 if __name__ == "__main__":
@@ -59,12 +61,15 @@ if __name__ == "__main__":
 
     print("Loading Dataset:")
     roi = (200, 200)
-    train_data = image_folder("data/lfw-deepfunneled", phase=None, crop_roi=roi, file_extension=".jpg")()
+    train_data = image_folder("data/lfw-deepfunneled", phase=None, crop_roi=roi, file_extension=".jpg")
 
-    noisy_img, img = next(train_data)
+    data_fn, data_params = train_data
+    data_gen = data_fn(data_params)
+
+    noisy_img, img = next(data_gen)
     print("Image shape:")
     print(img.shape)
 
-    for noisy_img, img in train_data:
+    for noisy_img, img in data_gen:
         plt.imshow(img)
         plt.show()
