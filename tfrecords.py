@@ -32,8 +32,8 @@ def _write_tf_record(data, record_filename, preprocess_feature=None, preprocess_
 
         example = tf.train.Example(features=tf.train.Features(
             feature={
-                'feature': _bytes_feature(feature.tobytes()),
-                'label': _bytes_feature(label.tobytes())
+                'feature': _bytes_feature(np.reshape(feature, (-1,)).tobytes()),
+                'label': _bytes_feature(np.reshape(label, (-1,)).tobytes())
                 }))
         writer.write(example.SerializeToString())
     writer.close()
@@ -51,9 +51,15 @@ def _read_tf_record(record_filename, feature_shape, label_shape, feature_type, l
         })
 
     feature = tf.decode_raw(data['feature'], feature_type)
-    feature.set_shape(feature_shape)
+    feature_len = 1
+    for x in list(feature_shape):
+        feature_len *= x
+    feature.set_shape((feature_len,))
+    label_len = 1
+    for x in list(label_shape):
+        label_len *= x
     label = tf.decode_raw(data['label'], label_type)
-    label.set_shape(label_shape)
+    label.set_shape((label_len,))
 
     return feature, label
 
@@ -81,6 +87,10 @@ def read_tf_records(folder, phase, batch_size):
         min_after_dequeue=5 * batch_size
     )
 
+    # Add batch dimension to feature and label shape
+
+    feature_batch = tf.reshape(feature_batch, tuple([batch_size] + list(feature_shape)), name="input/"+phase+"_features_reshape")
+    label_batch = tf.reshape(label_batch, tuple([batch_size] + list(label_shape)), name="input/"+phase+"_labels_reshape")
     return feature_batch, label_batch
 
 
