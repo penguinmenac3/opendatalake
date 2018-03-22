@@ -8,7 +8,7 @@ def batch_generator(data, batch_size=0):
     if batch_size <= 0:
         features = []
         labels = []
-        data_gen = data()
+        data_gen = data[0](data[1])
         for feature, label in data_gen:
             features.append(feature)
             labels.append(label)
@@ -17,7 +17,7 @@ def batch_generator(data, batch_size=0):
         while True:
             yield out_tuple
     else:
-        data_gen = data(infinite=True)
+        data_gen = data[0](data[1], infinite=True)
         while True:
             features = []
             labels = []
