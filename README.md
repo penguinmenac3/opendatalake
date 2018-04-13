@@ -1,4 +1,4 @@
-## Datasets [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+## OpenDataLake [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Since it is all about data, this are data wrappers for common datasets which load the data into a common structure.
 
@@ -10,11 +10,11 @@ To get you started quickly.
 Here are all classification datasets.
 They are loaded as a generator spitting out a feature(-vector/image) and a one-hot-encoded label.
 
-1. [Named Folders (Foldername = Label)](classification/named_folders.py)
-2. [MNIST](classification/mnist.py)
+1. [Named Folders (Foldername = Label)](opendatalake/classification/named_folders.py)
+2. [MNIST](opendatalake/classification/mnist.py)
 3. ImageNet [TODO]
-4. [Cifar10/Cifar100](classification/cifar.py)
-5. [LFW (named folders)](classification/named_folders.py)
+4. [Cifar10/Cifar100](opendatalake/classification/cifar.py)
+5. [LFW (named folders)](opendatalake/classification/named_folders.py)
 6. PASCAL VOC [TODO]
 7. Places [TODO]
 
