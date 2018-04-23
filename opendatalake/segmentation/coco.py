@@ -44,10 +44,10 @@ def download_all(data_dir="data/coco"):
         download(data_type=dataset, data_dir=data_dir)
 
 
-def _gen(params, skip_n=1, offset=0):
+def _gen(params, stride=1, offset=0):
     base_dir, phase, dataset, N, prepare_features, prepare_labels = params
 
-    for idx in range(offset, N, skip_n):
+    for idx in range(offset, N, stride):
         filename = '%s/images/%s/%s' % (base_dir, phase, dataset['images'][idx]['file_name'])
         feature = imread(filename, mode="RGB")
         labels = None  # TODO load instance segmentation and bounding boxes
@@ -55,7 +55,7 @@ def _gen(params, skip_n=1, offset=0):
             feature = prepare_features(feature)
         if prepare_labels:
             labels = prepare_labels(labels)
-        yield (feature, labels)
+        yield ({"image": feature}, {"segmentation": labels})
 
 
 def coco(base_dir, phase, prepare_features=None, prepare_labels=None):

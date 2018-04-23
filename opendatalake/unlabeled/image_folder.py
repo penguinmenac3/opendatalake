@@ -12,11 +12,11 @@ def crop_center(img,cropy,cropx):
     return img[starty:starty+cropy, startx:startx+cropx, :]
 
 
-def _gen(params, skip_n=1, offset=0, infinite=False):
+def _gen(params, stride=1, offset=0, infinite=False):
     images, crop_roi, prepare_features, add_noise = params
     loop_condition = True
     while loop_condition:
-        for idx in range(offset, len(images), skip_n):
+        for idx in range(offset, len(images), stride):
             feature = imread(images[idx], mode="RGB")
             if crop_roi is not None:
                 feature = crop_center(feature, crop_roi[0], crop_roi[1])
@@ -25,7 +25,7 @@ def _gen(params, skip_n=1, offset=0, infinite=False):
             noisy_feature = feature
             if add_noise:
                 pass  # TODO add noise
-            yield (noisy_feature, feature)
+            yield ({"image": noisy_feature}, {"image": feature})
         loop_condition = infinite
 
 
@@ -66,10 +66,10 @@ if __name__ == "__main__":
     data_fn, data_params = train_data
     data_gen = data_fn(data_params)
 
-    noisy_img, img = next(data_gen)
+    feature, label = next(data_gen)
     print("Image shape:")
-    print(img.shape)
+    print(label["image"].shape)
 
-    for noisy_img, img in data_gen:
-        plt.imshow(img)
+    for feature, label in data_gen:
+        plt.imshow(label["image"])
         plt.show()

@@ -2,12 +2,12 @@ from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
 
 
-def _gen(params, skip_n=1, offset=0, infinite=False):
+def _gen(params, stride=1, offset=0, infinite=False):
     images, labels = params
     loop_condition = True
     while loop_condition:
-        for idx in range(offset, len(images), skip_n):
-            yield (images[idx], labels[idx])
+        for idx in range(offset, len(images), stride):
+            yield ({"image": images[idx]}, {"probs": labels[idx]})
         loop_condition = infinite
 
 
@@ -35,10 +35,10 @@ if __name__ == "__main__":
     data_fn, data_params = train_data
     data_gen = data_fn(data_params)
 
-    img, label = next(data_gen)
+    feature, label = next(data_gen)
     print("Image shape:")
-    print(img.shape)
+    print(feature["image"].shape)
 
-    for img, label in data_gen:
-        plt.imshow(img)
+    for feature, label in data_gen:
+        plt.imshow(feature["image"])
         plt.show()

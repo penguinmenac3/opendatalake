@@ -19,12 +19,12 @@ def crop_center(img,cropy,cropx):
     return img[starty:starty+cropy, startx:startx+cropx, :]
 
 
-def _gen(params, skip_n=1, offset=0, infinite=False):
+def _gen(params, stride=1, offset=0, infinite=False):
     images, no_split_folder, phase, crop_roi, prepare_features, labels, n_classes = params
 
     loop_condition = True
     while loop_condition:
-        for idx in range(offset, len(images), skip_n):
+        for idx in range(offset, len(images), stride):
             if no_split_folder and idx % no_split_folder == 0 and phase == PHASE_TRAIN:
                 continue
 
@@ -36,7 +36,7 @@ def _gen(params, skip_n=1, offset=0, infinite=False):
                 feature = crop_center(feature, crop_roi[0], crop_roi[1])
             if prepare_features:
                 feature = prepare_features(feature)
-            yield (feature, one_hot(labels[idx], n_classes))
+            yield ({"image": feature}, {"probs": one_hot(labels[idx], n_classes)})
         loop_condition = infinite
 
 
@@ -94,8 +94,8 @@ if __name__ == "__main__":
 
     img, label = next(data_gen)
     print("Image shape:")
-    print(img.shape)
+    print(img["image"].shape)
 
     for img, label in data_gen:
-        plt.imshow(img)
+        plt.imshow(img["image"])
         plt.show()
