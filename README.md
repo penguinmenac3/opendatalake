@@ -5,6 +5,14 @@ Since it is all about data, this are data wrappers for common datasets which loa
 There are handlers for several datasets.
 To get you started quickly.
 
+## Install
+
+Simply install it via pip.
+
+```bash
+pip install https://github.com/penguinmenac3/opendatalake/archive/master.zip
+```
+
 ## Classification
 
 Here are all classification datasets.
