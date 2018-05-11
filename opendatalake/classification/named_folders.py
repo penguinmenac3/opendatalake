@@ -3,7 +3,9 @@ from scipy.misc import imread
 from random import shuffle
 import numpy as np
 import json
-from datasets.tfrecords import PHASE_TRAIN, PHASE_VALIDATION
+
+PHASE_TRAIN = "train"
+PHASE_VALIDATION = "validation"
 
 
 def one_hot(idx, max_idx):
