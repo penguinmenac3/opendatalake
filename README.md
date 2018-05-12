@@ -10,7 +10,7 @@ To get you started quickly.
 Simply install it via pip.
 
 ```bash
-pip install https://github.com/penguinmenac3/opendatalake/archive/master.zip
+pip install opendatalake
 ```
 
 ## Classification
