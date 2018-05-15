@@ -56,7 +56,7 @@ def _gen(params, stride=1, offset=0, infinite=False):
         loop_condition = infinite
 
 
-def named_folders(base_dir, phase, data_split=0.1):
+def kitti_detection(base_dir, phase, data_split=0.1):
     images = []
     calibrations = []
     features = []
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
     print("Loading Dataset:")
-    train_data = named_folders("datasets/kitti_detection", phase=PHASE_TRAIN)
+    train_data = kitti_detection("datasets/kitti_detection", phase=PHASE_TRAIN)
 
     data_fn, data_params = train_data
     data_gen = data_fn(data_params)
