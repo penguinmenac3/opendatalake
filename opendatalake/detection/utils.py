@@ -48,6 +48,26 @@ class Detection(object):
         """
         return
 
+    @abc.abstractmethod
+    def copy(self):
+        """
+        Create a copy of the image.
+
+        :return:
+        """
+        return
+
+    @abc.abstractmethod
+    def move_image(self, dx, dy):
+        """
+        Move the image the annotation is according to by some pixels.
+
+        :param dx: The amount of pixels the origin of the image is moved to the right.
+        :param dy: The amount of pixels the origin of the image is moved to the bottom.
+        :return:
+        """
+        return
+
     def __repr__(self):
         return self.__str__()
 
@@ -66,8 +86,27 @@ class Detection2d(Detection):
         self.h = h
         self.theta = theta
 
+    def move_image(self, dx, dy):
+        self.cx = self.cx - dx
+        self.cy = self.cy - dy
+
+    def copy(self):
+        return Detection2d(self.class_id, self.cx, self.cy, self.w, self.h, self.theta)
+
     def iou(self, other):
-        raise NotImplementedError("IoU not implemented for 2d yet.")
+        # Calculate edges of intersection area
+        x_left = max(self.cx - self.w / 2.0, other.cx - other.w / 2.0)
+        y_top = max(self.cy - self.h / 2.0, other.cy - other.h / 2.0)
+        x_right = min(self.cx + self.w / 2.0, other.cx + other.w / 2.0)
+        y_bottom = min(self.cy + self.h / 2.0, other.cy - other.h / 2.0)
+
+        # Calculate areas
+        intersection_area = (x_right - x_left + 1) * (y_bottom - y_top + 1)
+        my_area = self.w * self.h
+        other_area = other.w * other.h
+
+        # Calculate and return iou
+        return intersection_area / float(my_area + other_area - intersection_area)
 
     def to_array(self):
         return [self.class_id, self.cx, self.cy, self.w, self.h, self.theta]
@@ -88,6 +127,13 @@ class Detection25d(Detection):
         self.h = h
         self.l = l
         self.theta = theta
+
+    def copy(self):
+        return Detection25d(self.class_id, self.cx, self.cy, self.dist, self.w, self.h, self.l, self.theta)
+
+    def move_image(self, dx, dy):
+        self.cx = self.cx - dx
+        self.cy = self.cy - dy
 
     def iou(self, other):
         raise NotImplementedError("IoU not implemented for 2.5d yet.")
@@ -140,6 +186,12 @@ class Detection3d(Detection):
         self.q1 = q1
         self.q2 = q2
         self.q3 = q3
+
+    def copy(self):
+        return Detection3d(self.class_id, self.cx, self.cy, self.cz, self.w, self.h, self.l, self.q0, self.q1, self.q2, self.q3)
+
+    def move_image(self, dx, dy):
+        raise NotImplementedError("Move image not implemented.")
 
     def iou(self, other):
         raise NotImplementedError("IoU not implemented for 3d yet.")
