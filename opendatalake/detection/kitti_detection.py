@@ -1,18 +1,11 @@
 import os
-from scipy.misc import imread
 import numpy as np
-import sys
+from scipy.misc import imread
 
-from opendatalake.detection.utils import Detection25d, Detection2d, apply_affine_transform, apply_projection, vec_len
+from opendatalake.detection.utils import Detection25d, Detection2d, apply_projection, vec_len
 
 PHASE_TRAIN = "train"
 PHASE_VALIDATION = "validation"
-
-
-def one_hot(idx, max_idx):
-    label = np.zeros(max_idx, dtype=np.uint8)
-    label[idx] = 1
-    return label
 
 
 def _gen(params, stride=1, offset=0, infinite=False):
@@ -42,12 +35,12 @@ def _gen(params, stride=1, offset=0, infinite=False):
 
                 # Calc cx and cy in image coordinates.
                 translation = [float(x) for x in date[11:14]]
-                center = np.array(translation) + np.array([0.0, -float(date[9]) / 2.0, 0])
+                center = np.array(translation) + np.array([0.0, -float(date[8]) / 2.0, 0])
                 projected_center = apply_projection(center, calibrations[idx])
-                dist = vec_len(translation)
+                dist = vec_len(center)
                 detections25d.append(Detection25d(class_id=date[0],
                                                     cx=projected_center[0][0], cy=projected_center[1][0], dist=dist,
-                                                    w=float(date[8]), h=float(date[9]), l=float(date[10]),
+                                                    w=float(date[9]), h=float(date[8]), l=float(date[10]),
                                                     theta=float(date[3])))
 
             feature = imread(images[idx], mode="RGB")

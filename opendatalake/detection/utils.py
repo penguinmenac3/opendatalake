@@ -99,14 +99,14 @@ class Detection25d(Detection):
         if projection_matrix is None:
             raise RuntimeError("Visualization not possible without projection matrix.")
 
-        corners = [[ self.l / 2.0,  self.w / 2.0,  self.h / 2.0],
-                   [ self.l / 2.0, -self.w / 2.0,  self.h / 2.0],
-                   [-self.l / 2.0, -self.w / 2.0,  self.h / 2.0],
-                   [-self.l / 2.0,  self.w / 2.0,  self.h / 2.0],
-                   [ self.l / 2.0,  self.w / 2.0, -self.h / 2.0],
-                   [ self.l / 2.0, -self.w / 2.0, -self.h / 2.0],
-                   [-self.l / 2.0, -self.w / 2.0, -self.h / 2.0],
-                   [-self.l / 2.0,  self.w / 2.0, -self.h / 2.0],
+        corners = [[ self.l / 2.0,  self.h / 2.0,  self.w / 2.0],
+                   [ self.l / 2.0,  self.h / 2.0, -self.w / 2.0],
+                   [-self.l / 2.0,  self.h / 2.0, -self.w / 2.0],
+                   [-self.l / 2.0,  self.h / 2.0,  self.w / 2.0],
+                   [ self.l / 2.0, -self.h / 2.0,  self.w / 2.0],
+                   [ self.l / 2.0, -self.h / 2.0, -self.w / 2.0],
+                   [-self.l / 2.0, -self.h / 2.0, -self.w / 2.0],
+                   [-self.l / 2.0, -self.h / 2.0,  self.w / 2.0],
                    [self.l / 1.5, 0, 0]]
 
         xyz = uv_distance_to_xyz(self.cx, self.cy, self.dist, projection_matrix)
