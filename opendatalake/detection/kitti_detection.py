@@ -49,7 +49,7 @@ def _gen(params, stride=1, offset=0, infinite=False):
         loop_condition = infinite
 
 
-def kitti_detection(base_dir, phase, data_split=0.1):
+def kitti_detection(base_dir, phase, data_split=10):
     images = []
     calibrations = []
     features = []
