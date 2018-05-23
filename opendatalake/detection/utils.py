@@ -98,15 +98,26 @@ class Detection2d(Detection):
         x_left = max(self.cx - self.w / 2.0, other.cx - other.w / 2.0)
         y_top = max(self.cy - self.h / 2.0, other.cy - other.h / 2.0)
         x_right = min(self.cx + self.w / 2.0, other.cx + other.w / 2.0)
-        y_bottom = min(self.cy + self.h / 2.0, other.cy - other.h / 2.0)
+        y_bottom = min(self.cy + self.h / 2.0, other.cy + other.h / 2.0)
+        intersection_w = (x_right - x_left)
+        intersection_h = (y_bottom - y_top)
+
+        # When the intersection edges are of negative size then there is no intersection.
+        if intersection_w < 0 or intersection_h < 0:
+            return 0
 
         # Calculate areas
-        intersection_area = (x_right - x_left + 1) * (y_bottom - y_top + 1)
+        intersection_area = intersection_w * intersection_h
         my_area = self.w * self.h
         other_area = other.w * other.h
+        union = my_area + other_area - intersection_area
+
+        # IOU is defined to be 1 if union area is 0.
+        if abs(union) < 0.00001:
+            return 1
 
         # Calculate and return iou
-        return intersection_area / float(my_area + other_area - intersection_area)
+        return intersection_area / float(union)
 
     def to_array(self):
         return [self.class_id, self.cx, self.cy, self.w, self.h, self.theta]

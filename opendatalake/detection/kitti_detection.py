@@ -30,8 +30,8 @@ def _gen(params, stride=1, offset=0, infinite=False):
 
                 rect = [float(x) for x in date[4:8]]
                 detections2d.append(Detection2d(class_id=date[0],
-                                                cx=(rect[0] + rect[2]) / 2.0, cy=(rect[1] - rect[3]) / 2.0,
-                                                w=rect[0] - rect[2], h=rect[1] - rect[3]))
+                                                cx=(rect[0] + rect[2]) / 2.0, cy=(rect[1] + rect[3]) / 2.0,
+                                                w=rect[2] - rect[0], h=rect[3] - rect[1]))
 
                 # Calc cx and cy in image coordinates.
                 translation = [float(x) for x in date[11:14]]
