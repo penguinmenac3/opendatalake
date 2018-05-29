@@ -3,6 +3,11 @@ import math
 import numpy as np
 import cv2
 
+try:
+    LINE_TYPE = cv2.LINE_AA
+except:
+    LINE_TYPE = cv2.CV_AA
+
 
 class Detection(object):
     __metaclass__ = abc.ABCMeta
@@ -179,7 +184,8 @@ class Detection25d(Detection):
                        (0, 8), (1, 8), (4, 8), (5, 8)]  # Pointy Nose
         lw = 2
         for i, j in connections:
-            cv2.line(image, corners[i], corners[j], color, lw, cv2.LINE_AA)
+            cv2.line(image, corners[i], corners[j], color, lw, LINE_TYPE)
+        cv2.circle(image, (int(self.cx), int(self.cy)), 5, color, thickness=2)
 
 
 class Detection3d(Detection):
