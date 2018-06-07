@@ -1,4 +1,5 @@
 import os
+import math
 import numpy as np
 from scipy.misc import imread
 
@@ -69,6 +70,103 @@ def kitti_detection(base_dir, phase, data_split=10):
                 features.append(data)
 
     return _gen, (images, calibrations, data_split, phase, features)
+
+
+def evaluate3d(predictor, prediction_2_detections, base_dir):
+    test_data = kitti_detection(base_dir, phase=PHASE_VALIDATION)
+    data_fn, data_params = test_data
+    data_gen = data_fn(data_params)
+    n = 100
+    treshs = [i / float(n) for i in range(n + 1)]
+
+    recalls = {}
+    s_rs = {}
+
+    for tresh in treshs:
+        recalls[tresh] = []
+        s_rs[tresh] = []
+
+    for feat, label in data_gen:
+        calib = feat["calibration"]
+        gts = label["detection_2.5d"]
+        predictor_output = predictor(feat)
+        for tresh in treshs:
+            preds = prediction_2_detections(predictor_output, tresh)
+            TP, FP, FN = _optimal_assign(preds, gts, calib)
+            recall = len(TP) / (len(TP) + len(FN))
+            s_r = 0
+            for p in TP:
+                s_r += (1.0 + math.cos(p.a.theta - p.b.theta)) / 2.0
+            s_r *= 1.0 / len(preds)
+            recalls[tresh].append(recall)
+            s_rs[tresh].append(s_r)
+
+    # Compute mean recalls and mean s_rs
+    for tresh in treshs:
+        recalls[tresh] = sum(recalls[tresh]) / float(len(recalls[tresh]))
+        s_rs[tresh] = sum(s_rs[tresh]) / float(len(s_rs[tresh]))
+
+    aos = 0
+    optimal_tresh = {}
+    for r in [i / float(10) for i in range(11)]:
+        max_s_r = 0
+        for tresh in treshs:
+            if recalls[tresh] >= r:
+                if max_s_r < s_rs[tresh]:
+                    max_s_r = s_rs[tresh]
+                    optimal_tresh[r] = tresh
+        aos += max_s_r
+    aos *= 1 / 11
+
+    return aos, optimal_tresh
+
+
+def _optimal_assign(preds, gts, projection_matrix, tresh=0.5):
+    TP, FP, FN = [], [], []
+
+    class matching(object):
+        def __init__(self, iou, a, b):
+            self.iou = iou
+            self.a = a
+            self.b = b
+
+        def __lt__(self, other):
+            return self.iou < other.iou
+
+        def __gt__(self, other):
+            return self.iou > other.iou
+
+    matches = []
+    for p in preds:
+        for g in gts:
+            iou = p.iou(g, projection_matrix=projection_matrix)
+            if iou > tresh:
+                matches.append(matching(iou, p, g))
+
+    matches = sorted(matches)
+
+    assigned = []
+    for m in matches:
+        # Check if a or b have already matched better to something else
+        if m.a in assigned or m.b in assigned:
+            continue
+
+        # It is the best match for this match
+        assigned.append(m.a)
+        assigned.append(m.b)
+        TP.append(m)
+
+    # All unassigned predictions are false positives.
+    for a in preds:
+        if a not in assigned:
+            FP.append(a)
+
+    # All unassigned ground truths are false negatives.
+    for b in gts:
+        if b not in assigned:
+            FN.append(b)
+
+    return TP, FP, FN
 
 
 if __name__ == "__main__":
