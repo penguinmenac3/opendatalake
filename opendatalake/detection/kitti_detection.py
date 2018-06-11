@@ -1,7 +1,10 @@
 import os
+import sys
+import time
 import math
 import numpy as np
 from scipy.misc import imread
+import matplotlib.pyplot as plt
 
 from opendatalake.detection.utils import Detection25d, Detection2d, apply_projection, vec_len
 
@@ -72,12 +75,13 @@ def kitti_detection(base_dir, phase, data_split=10):
     return _gen, (images, calibrations, data_split, phase, features)
 
 
-def evaluate3d(predictor, prediction_2_detections, base_dir):
+def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False):
+    print("Loading Data.")
     test_data = kitti_detection(base_dir, phase=PHASE_VALIDATION)
     data_fn, data_params = test_data
     data_gen = data_fn(data_params)
-    n = 100
-    treshs = [i / float(n) for i in range(n + 1)]
+    n = 20
+    treshs = [(i+1) / float(n) for i in range(n - 1)]
 
     recalls = {}
     s_rs = {}
@@ -86,21 +90,50 @@ def evaluate3d(predictor, prediction_2_detections, base_dir):
         recalls[tresh] = []
         s_rs[tresh] = []
 
+    print("Evaluating Samples")
+    i = 0
     for feat, label in data_gen:
+        print("Sample {}\r".format(i))
+        i += 1
         calib = feat["calibration"]
-        gts = label["detection_2.5d"]
-        predictor_output = predictor(feat)
+        gts = label["detections_2.5d"]
+        start = time.time()
+        predictor_output = predictor(feat["image"])
+        prediction_time = time.time() - start
         for tresh in treshs:
-            preds = prediction_2_detections(predictor_output, tresh)
+            start = time.time()
+            preds = prediction_2_detections(predictor_output, tresh, calib)
+            conversion_time = time.time() - start
             TP, FP, FN = _optimal_assign(preds, gts, calib)
             recall = len(TP) / (len(TP) + len(FN))
             s_r = 0
             for p in TP:
                 s_r += (1.0 + math.cos(p.a.theta - p.b.theta)) / 2.0
-            s_r *= 1.0 / len(preds)
+            normalizer = len(preds)
+            if normalizer == 0:
+                s_r = 0
+                print("Warn: No preds!")
+                # FIXME is this a good idea?
+            else:
+                s_r *= 1.0 / normalizer
             recalls[tresh].append(recall)
             s_rs[tresh].append(s_r)
 
+            if visualize:
+                print("TP {} FP {} FN {} Tresh {:.2f} CNN {:.3f}s Postprocessing {:.3f}s".format(len(TP), len(FP), len(FN), tresh, prediction_time, conversion_time))
+                image = feat["image"].copy()
+                for match in TP:
+                    match.b.visualize(image, (0, 255, 255), projection_matrix=calib)
+                    match.a.visualize(image, (0, 255, 0), projection_matrix=calib)
+                for a in FP:
+                    a.visualize(image, (255, 0, 0), projection_matrix=calib)
+                for b in FN:
+                    b.visualize(image, (128, 0, 0), projection_matrix=calib)
+                plt.title("TP {} FP {} FN {} Tresh {:.2f}".format(len(TP), len(FP), len(FN), tresh))
+                plt.imshow(image)
+                plt.savefig("images/{:04d}_{:.2f}.png".format(i, tresh))
+
+    print("Computing AOS.")
     # Compute mean recalls and mean s_rs
     for tresh in treshs:
         recalls[tresh] = sum(recalls[tresh]) / float(len(recalls[tresh]))
@@ -118,6 +151,7 @@ def evaluate3d(predictor, prediction_2_detections, base_dir):
         aos += max_s_r
     aos *= 1 / 11
 
+    print("Computing AOS done.")
     return aos, optimal_tresh
 
 

@@ -153,10 +153,10 @@ class Detection25d(Detection):
 
     def to_2d_detection(self, projection_matrix):
         corners = self._project_corners(projection_matrix)
-        min_x = None
-        max_x = None
-        min_y = None
-        max_y = None
+        min_x = 1000000
+        max_x = 0
+        min_y = 1000000
+        max_y = 0
         for corner in corners:
             min_x = min(min_x, corner[0][0])
             max_x = max(max_x, corner[0][0])
