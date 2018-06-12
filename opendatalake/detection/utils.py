@@ -87,8 +87,8 @@ class Detection2d(Detection):
         self.class_id = class_id
         self.cx = cx
         self.cy = cy
-        self.w = w
-        self.h = h
+        self.w = abs(w)
+        self.h = abs(h)
         self.theta = theta
 
     def move_image(self, dx, dy):
@@ -128,7 +128,11 @@ class Detection2d(Detection):
         return [self.class_id, self.cx, self.cy, self.w, self.h, self.theta]
 
     def visualize(self, image, color):
-        raise NotImplementedError("Visualization not implemented.")
+        cv2.rectangle(image,
+                      (int(self.cx - self.w / 2.0), int(self.cy - self.h / 2.0)),
+                      (int(self.cx + self.w / 2.0), int(self.cy + self.h / 2.0)),
+                      (color[1], color[0], color[2]),
+                      thickness=1)
 
 
 class Detection25d(Detection):
