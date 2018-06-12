@@ -31,61 +31,27 @@ They are loaded as a generator spitting out a feature(-vector/image) and a one-h
 Here are all segmentation datasets.
 They are loaded as a generator spitting out a feature(-vector/image) and segmentation(-vector/image).
 
-1. Coco [TODO]
+1. [Coco (WIP)](opendatalake/segmentation/coco.py)
 2. CamVid [TODO]
 3. Cityscapes [TODO]
 
 
-## Regression
+## Detection
 
-Here are all regression datasets.
-They are loaded as a generator spitting out a feature(-vector/image) regression(-vector) the size of the vector to regress depends on the problem.
+Here are all detection datasets.
+They are loaded as a generator spitting out a feature(-vector/image) and a detections(-vector/image).
+A detection is either a detection_2d, detection_2.5d or detection_3d object defined [here](opendatalake/detection/utils.py).
 
-### 2d-Detection (bounding boxes)
+1. [Bosch TLR](opendatalake/detection/bosch_tlr.py)
+2. [Coco (WIP)](opendatalake/detection/coco.py)
+3. [Kitti Detection (incl. 3d)](opendatalake/detection/kitti_detection.py)
+4. [Pascal Voc 3d (WIP)](opendatalake/detection/pascal_voc_3d.py)
+5. [Udacity Autti (WIP)](opendatalake/detection/udacity_autti.py)
+6. [Udacity Crowdai (WIP)](opendatalake/detection/udacity_crowdai.py)
 
-The data structure is difficult to describe, but this sample should make it quite obvious:
-```python
-feature, regression = next(data)
-for instance in regression:
-    one_hot_class_label = instance[:num_classes]
-    x, y, width, height = instance[num_classes:]
-```
+## Unlabeled
 
-To make stuff simple there is a visualize-method.
-```python
-image = visualize(image, x, y, width, height, class_label=None)
-```
+Here are all unlabeled datasets.
+They are loaded as a generator spitting out a feature(-vector/image).
 
-1. Kitti 2d [TODO]
-2. Tensorbox [TODO]
-3. ImageNet Object Localization [TODO]
-
-### 3d-Detection (bounding boxes)
-
-The data structure similar to 2d detection and difficult to describe, but this sample should make it quite obvious:
-
-```python
-feature, regression = next(data)
-for instance in regression:
-    one_hot_class_label = instance[:num_classes]
-    x, y, width, height = instance[num_classes:num_classes + 4]
-    x3d, y3d, z3d, width3d, heigh3d, length3d, roll, pitch, yaw = instance[num_classes + 4:]
-```
-
-As stuff gets complicated here, there are helper functions like project returning a list of 2d points.
-As well as a visualize method.
-Because debugging is hell in 3d.
-
-```python
-[(x1, y1), ..., (x8, y8)] = project(x, y, z, width, heigh, length, roll, pitch, yaw)
-image = visualize(image, [(x1, y1), ..., (x8, y8)])
-```
-
-1. Kitti 3d [TODO]
-
-Are there more? Please let me know.
-
-### Misc
-
-Nothing here yet.
-However, there might be regression datasets that I will put here.
+1. [Image Folder](opendatalake/unlabeled/image_folder.py)
