@@ -77,7 +77,8 @@ def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False):
     data_fn, data_params = test_data
     data_gen = data_fn(data_params)
     n = 20
-    treshs = [(i+1) / float(n) for i in range(n - 1)]
+    off = 10
+    treshs = [(i+off) / float(n) for i in range(n - off)]
 
     recalls = {}
     s_rs = {}
