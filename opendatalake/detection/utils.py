@@ -155,16 +155,39 @@ class Detection25d(Detection):
         self.cx = self.cx - dx
         self.cy = self.cy - dy
 
-    def iou(self, other):
-        raise NotImplementedError("IoU not implemented for 2.5d yet.")
+    def to_2d_detection(self, projection_matrix):
+        corners = self._project_corners(projection_matrix)
+        min_x = 1000000
+        max_x = 0
+        min_y = 1000000
+        max_y = 0
+        for corner in corners:
+            min_x = min(min_x, corner[0][0])
+            max_x = max(max_x, corner[0][0])
+
+            min_y = min(min_y, corner[1][0])
+            max_y = max(max_y, corner[1][0])
+
+        cx = (max_x + min_x) / 2
+        cy = (max_y + min_y) / 2
+        w = max_x - min_x
+        h = max_y - min_y
+
+        return Detection2d(self.class_id, cx, cy, w, h)
+
+    def iou(self, other, projection_matrix=None):
+        if projection_matrix is None:
+            raise RuntimeError("IoU computation not possible without projection matrix.")
+
+        detection2d = self.to_2d_detection(projection_matrix)
+        other2d = other.to_2d_detection(projection_matrix)
+
+        return detection2d.iou(other2d)
 
     def to_array(self):
         return [self.class_id, self.cx, self.cy, self.dist, self.w, self.h, self.l, self.theta]
 
-    def visualize(self, image, color, projection_matrix=None):
-        if projection_matrix is None:
-            raise RuntimeError("Visualization not possible without projection matrix.")
-
+    def _project_corners(self, projection_matrix=None):
         corners = [[ self.l / 2.0,  self.h / 2.0,  self.w / 2.0],
                    [ self.l / 2.0,  self.h / 2.0, -self.w / 2.0],
                    [-self.l / 2.0,  self.h / 2.0, -self.w / 2.0],
@@ -178,7 +201,13 @@ class Detection25d(Detection):
         xyz = uv_distance_to_xyz(self.cx, self.cy, self.dist, projection_matrix)
         world_space_theta = self.theta - math.atan2(xyz[2], xyz[0]) + math.radians(90)
         corners = [apply_affine_transform(x, theta=world_space_theta, translation=xyz) for x in corners]
-        corners = [apply_projection(x, projection_matrix) for x in corners]
+        return [apply_projection(x, projection_matrix) for x in corners]
+
+    def visualize(self, image, color, projection_matrix=None):
+        if projection_matrix is None:
+            raise RuntimeError("Visualization not possible without projection matrix.")
+
+        corners = self._project_corners(projection_matrix)
         corners = [(int(x[0][0]), int(x[1][0])) for x in corners]
 
         connections = [(1, 2), (3, 0),  # Sides
