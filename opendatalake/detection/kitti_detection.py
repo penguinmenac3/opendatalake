@@ -205,6 +205,7 @@ def _optimal_assign(preds, gts, projection_matrix, tresh=0.5):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+    from opendatalake.texture_augmentation import full_texture_augmentation
 
     print("Loading Dataset:")
     train_data = kitti_detection("datasets/kitti_detection", phase=PHASE_TRAIN)
@@ -214,6 +215,7 @@ if __name__ == "__main__":
 
     for feat, label in data_gen:
         img = feat["image"].copy()
+        img = full_texture_augmentation(img)
         for detection in label["detections_2.5d"]:
             detection.visualize(img, color=(255, 0, 0), projection_matrix=feat["calibration"])
         plt.imshow(img)
