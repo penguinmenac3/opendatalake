@@ -201,7 +201,6 @@ def _optimal_assign(preds, gts, projection_matrix, tresh=0.5):
 
 
 if __name__ == "__main__":
-    import matplotlib.pyplot as plt
     from opendatalake.texture_augmentation import full_texture_augmentation
 
     print("Loading Dataset:")

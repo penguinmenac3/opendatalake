@@ -2,6 +2,9 @@ import abc
 import math
 import numpy as np
 import cv2
+import random
+
+from opendatalake.texture_augmentation import full_texture_augmentation
 
 try:
     LINE_TYPE = cv2.LINE_AA
@@ -198,9 +201,9 @@ class Detection25d(Detection):
                    [-self.l / 2.0, -self.h / 2.0,  self.w / 2.0],
                    [self.l / 1.5, 0, 0]]
 
-        xyz = uv_distance_to_xyz(self.cx, self.cy, self.dist, projection_matrix)
+        xyz = _uv_distance_to_xyz(self.cx, self.cy, self.dist, projection_matrix)
         world_space_theta = self.theta - math.atan2(xyz[2], xyz[0]) + math.radians(90)
-        corners = [apply_affine_transform(x, theta=world_space_theta, translation=xyz) for x in corners]
+        corners = [_apply_affine_transform(x, theta=world_space_theta, translation=xyz) for x in corners]
         return [apply_projection(x, projection_matrix) for x in corners]
 
     def visualize(self, image, color, projection_matrix=None):
@@ -253,7 +256,7 @@ class Detection3d(Detection):
         raise NotImplementedError("Visualization not implemented.")
 
 
-def apply_affine_transform(point, theta, translation):
+def _apply_affine_transform(point, theta, translation):
     c = math.cos(theta)
     s = math.sin(theta)
     rot_mat = np.array([[c, 0, s],
@@ -281,7 +284,7 @@ def vec_len(vector):
     return math.sqrt(len2)
 
 
-def uv_distance_to_xyz(u, v, distance, projection_matrix):
+def _uv_distance_to_xyz(u, v, distance, projection_matrix):
     m00 = float(projection_matrix[0][0])
     m11 = float(projection_matrix[1][1])
     m02 = float(projection_matrix[0][2])
@@ -312,3 +315,152 @@ def solve_quadratic_equation(a, b, c):
     solution_1 = (-b - math.sqrt(b * b - 4 * a * c)) / (2 * a)
     solution_2 = (-b + math.sqrt(b * b - 4 * a * c)) / (2 * a)
     return solution_1, solution_2
+
+
+def crop_image(img, start_y, start_x, h, w):
+    """
+    Crop an image given the top left corner.
+    :param img: The image
+    :param start_y: The top left corner y coord
+    :param start_x: The top left corner x coord
+    :param h: The result height
+    :param w: The result width
+    :return: The cropped image.
+    """
+    return img[start_y:start_y + h, start_x:start_x + w, :].copy()
+
+
+def move_detections(label, dy, dx):
+    """
+    Move detections in direction dx, dy.
+
+    :param label: The label dict containing all detection lists.
+    :param dy: The delta in y direction as a number.
+    :param dx: The delta in x direction as a number.
+    :return:
+    """
+    for k in label.keys():
+        if k.startswith("detection"):
+            detections = label[k]
+            for detection in detections:
+                detection.cy += dy
+                detection.cx += dx
+
+
+def hflip_detections(label, w):
+    """
+    Horizontally flip detections according to an image flip.
+
+    :param label: The label dict containing all detection lists.
+    :param w: The width of the image as a number.
+    :return:
+    """
+    for k in label.keys():
+        if k.startswith("detection"):
+            detections = label[k]
+            for detection in detections:
+                detection.cx = w - detection.cx
+                if k == "detections_2.5d":
+                    detection.theta = math.pi - detection.theta
+
+
+def augment_detections(hyper_params, feature, label):
+    """
+    Augment the detection dataset.
+
+    In your hyper_parameters.problem.augmentation add configurations to enable features.
+    Supports "enable_horizontal_flip", "enable_micro_translation", "random_crop" : {"shape": { "width", "height" }}
+    and "enable_texture_augmentation". Make sure to also set the "steps" otherwise this method will not be used properly.
+
+    Random crop ensures at least one detection is in the crop region.
+
+    Sample configuration
+    "problem": {
+        "augmentation": {
+            "steps": 40,
+            "enable_texture_augmentation": true,
+            "enable_micro_translation": true,
+            "enable_horizontal_flip": true,
+            "random_crop": {
+                "shape": {
+                    "width": 256,
+                    "height": 256
+                }
+            }
+        }
+    }
+
+    :param hyper_params: The hyper parameters object
+    :param feature: A dict containing all features, must be in the style created by detection datasets.
+    :param label: A label dict in the detection dataset style.
+    :return: Modified feature and label dict (copied & modified).
+    """
+    # Do not augment these ways:
+    # 1) Rotation is not possible
+    # 3) Scaling is not possible, because it ruins depth perception
+    # However, random crops can improve performance. (Training speed and accuracy)
+    if hyper_params.problem.get_or_default("augmentation", None) is None:
+        return feature, label
+
+    img_h, img_w, img_c = feature["image"].shape
+    augmented_feature = {}
+    augmented_label = {}
+    augmented_feature["image"] = feature["image"].copy()
+    if "calibration" in feature:
+        augmented_feature["calibration"] = feature["calibration"]
+    augmented_feature["hflipped"] = np.array([0], dtype=np.uint8)
+    augmented_feature["crop_offset"] = np.array([0, 0], dtype=np.int8)
+
+    for k in label.keys():
+        augmented_label[k] = [detection.copy() for detection in label[k]]
+
+    if hyper_params.problem.augmentation.get_or_default("enable_horizontal_flip", False):
+        if random.random() < 0.5:
+            img_h, img_w, img_c = augmented_feature["image"].shape
+            augmented_feature["image"] = np.fliplr(augmented_feature["image"])
+            augmented_feature["hflipped"][0] = 1
+            hflip_detections(augmented_label, img_w)
+
+    if hyper_params.problem.augmentation.get_or_default("enable_micro_translation", False):
+        img_h, img_w, img_c = augmented_feature["image"].shape
+        dx = int(random.random() * 3)
+        dy = int(random.random() * 3)
+
+        augmented_feature["image"] = crop_image(augmented_feature["image"], dy, dx, img_h - dy, img_w - dx)
+        augmented_feature["crop_offset"][0] += dy
+        augmented_feature["crop_offset"][1] += dx
+
+        move_detections(augmented_label, -dy, -dx)
+
+    if hyper_params.problem.augmentation.get_or_default("random_crop", None) is not None and len(augmented_label["detections_2d"]) != 0:
+        img_h, img_w, img_c = augmented_feature["image"].shape
+        target_w = hyper_params.problem.augmentation.random_crop.shape.width
+        target_h = hyper_params.problem.augmentation.random_crop.shape.height
+
+        idx = random.randint(0, len(augmented_label["detections_2d"]) - 1)
+        detection = augmented_label["detections_2d"][idx]
+
+        # Compute start point so that crop fit's into image and random crop contains detection
+        start_x = int(detection.cx - random.random() * (target_w - 20) / 2.0 - 10)
+        start_y = int(detection.cy - random.random() * (target_h - 20) / 2.0 - 10)
+        if start_x < 0:
+            start_x = 0
+        if start_y < 0:
+            start_y = 0
+        if start_x >= img_w - target_w:
+            start_x = img_w - target_w - 1
+        if start_y >= img_h - target_h:
+            start_y = img_h - target_h - 1
+
+        # Crop image
+        augmented_feature["image"] = crop_image(augmented_feature["image"], start_y, start_x, target_h, target_w)
+        augmented_feature["crop_offset"][0] += start_y
+        augmented_feature["crop_offset"][1] += start_x
+
+        # Crop labels
+        move_detections(augmented_label, -start_y, -start_x)
+
+    if hyper_params.problem.augmentation.get_or_default("enable_texture_augmentation", False):
+        augmented_feature["image"] = full_texture_augmentation(augmented_feature["image"])
+
+    return augmented_feature, augmented_label
