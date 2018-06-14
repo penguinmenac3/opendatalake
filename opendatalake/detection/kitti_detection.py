@@ -76,7 +76,7 @@ def kitti_detection(base_dir, phase, data_split=10):
     return _gen, (filenames, data_split, phase, base_dir)
 
 
-def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, inline_plotting=False):
+def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, inline_plotting=False, img_path_prefix=None):
     if NO_IPYTHON:
         print("Inline plotting not availible. Could not find ipython clear_output")
         inline_plotting = False
@@ -98,6 +98,14 @@ def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, in
     print("Evaluating Samples")
     i = 0
     for feat, label in data_gen:
+        if inline_plotting and i > 0:
+            clear_output()
+            plt.clf()
+            plt.title("Recall Curve")
+            plt.xlabel("Treshs")
+            plt.ylabel("Recall")
+            plt.plot(treshs, [sum(recalls[t])/float(len(recalls[t])) for t in treshs])
+            plt.show()
         print("Sample {}\r".format(i))
         i += 1
         calib = feat["calibration"]
@@ -134,11 +142,13 @@ def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, in
                     a.visualize(image, (255, 0, 0), projection_matrix=calib)
                 for b in FN:
                     b.visualize(image, (128, 0, 0), projection_matrix=calib)
-                if inline_plotting:
-                    clear_output()
+                plt.clf()
                 plt.title("TP {} FP {} FN {} Tresh {:.2f}".format(len(TP), len(FP), len(FN), tresh))
                 plt.imshow(image)
-                plt.savefig("images/{:04d}_{:.2f}.png".format(i, tresh))
+                img_path = "images/{:04d}_{:.2f}.png".format(i, tresh)
+                if img_path_prefix is not None:
+                    img_path = os.path.join(img_path_prefix, img_path)
+                plt.savefig(img_path)
 
     print("Computing AOS.")
     # Compute mean recalls and mean s_rs
