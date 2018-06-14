@@ -5,6 +5,11 @@ import math
 import numpy as np
 from scipy.misc import imread
 import matplotlib.pyplot as plt
+try:
+    from IPython.display import clear_output
+    NO_IPYTHON = False
+except ModuleNotFoundError:
+    NO_IPYTHON = True
 
 from opendatalake.detection.utils import Detection25d, Detection2d, apply_projection, vec_len
 
@@ -71,7 +76,10 @@ def kitti_detection(base_dir, phase, data_split=10):
     return _gen, (filenames, data_split, phase, base_dir)
 
 
-def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False):
+def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, inline_plotting=False):
+    if NO_IPYTHON:
+        print("Inline plotting not availible. Could not find ipython clear_output")
+        inline_plotting = False
     print("Loading Data.")
     test_data = kitti_detection(base_dir, phase=PHASE_VALIDATION)
     data_fn, data_params = test_data
@@ -126,6 +134,8 @@ def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False):
                     a.visualize(image, (255, 0, 0), projection_matrix=calib)
                 for b in FN:
                     b.visualize(image, (128, 0, 0), projection_matrix=calib)
+                if inline_plotting:
+                    clear_output()
                 plt.title("TP {} FP {} FN {} Tresh {:.2f}".format(len(TP), len(FP), len(FN), tresh))
                 plt.imshow(image)
                 plt.savefig("images/{:04d}_{:.2f}.png".format(i, tresh))
