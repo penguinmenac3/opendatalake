@@ -461,6 +461,7 @@ def augment_detections(hyper_params, feature, label):
         move_detections(augmented_label, -start_y, -start_x)
 
     if hyper_params.problem.augmentation.get_or_default("enable_texture_augmentation", False):
-        augmented_feature["image"] = full_texture_augmentation(augmented_feature["image"])
+        if random.random() < 0.5:
+            augmented_feature["image"] = full_texture_augmentation(augmented_feature["image"])
 
     return augmented_feature, augmented_label

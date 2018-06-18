@@ -76,7 +76,7 @@ def kitti_detection(base_dir, phase, data_split=10):
     return _gen, (filenames, data_split, phase, base_dir)
 
 
-def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, inline_plotting=False, img_path_prefix=None):
+def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, inline_plotting=False, img_path_prefix=None, min_tresh=0.5, steps=11):
     if NO_IPYTHON:
         print("Inline plotting not availible. Could not find ipython clear_output")
         inline_plotting = False
@@ -84,9 +84,7 @@ def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, in
     test_data = kitti_detection(base_dir, phase=PHASE_VALIDATION)
     data_fn, data_params = test_data
     data_gen = data_fn(data_params)
-    n = 20
-    off = 10
-    treshs = [(i+off) / float(n) for i in range(n - off)]
+    treshs = [min_tresh + i / float(steps - 1) * (1.0 - min_tresh) for i in range(steps)]
 
     recalls = {}
     s_rs = {}
@@ -100,12 +98,6 @@ def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, in
     for feat, label in data_gen:
         if inline_plotting and i > 0:
             clear_output()
-            plt.clf()
-            plt.title("Recall Curve")
-            plt.xlabel("Treshs")
-            plt.ylabel("Recall")
-            plt.plot(treshs, [sum(recalls[t])/float(len(recalls[t])) for t in treshs])
-            plt.show()
         print("Sample {}\r".format(i))
         i += 1
         calib = feat["calibration"]
@@ -149,6 +141,15 @@ def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, in
                 if img_path_prefix is not None:
                     img_path = os.path.join(img_path_prefix, img_path)
                 plt.savefig(img_path)
+                plt.show()
+        
+        if inline_plotting and i > 0:
+            plt.clf()
+            plt.title("Recall Curve")
+            plt.xlabel("Treshs")
+            plt.ylabel("Recall")
+            plt.plot(treshs, [sum(recalls[t])/float(len(recalls[t])) for t in treshs])
+            plt.show()
 
     print("Computing AOS.")
     # Compute mean recalls and mean s_rs
