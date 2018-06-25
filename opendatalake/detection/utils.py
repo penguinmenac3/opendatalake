@@ -190,6 +190,9 @@ class Detection25d(Detection):
     def to_array(self):
         return [self.class_id, self.cx, self.cy, self.dist, self.w, self.h, self.l, self.theta]
 
+    def get_xyz(self, projection_matrix=None):
+        return _uv_distance_to_xyz(self.cx, self.cy, self.dist, projection_matrix)
+    
     def _project_corners(self, projection_matrix=None):
         corners = [[ self.l / 2.0,  self.h / 2.0,  self.w / 2.0],
                    [ self.l / 2.0,  self.h / 2.0, -self.w / 2.0],
@@ -201,7 +204,7 @@ class Detection25d(Detection):
                    [-self.l / 2.0, -self.h / 2.0,  self.w / 2.0],
                    [self.l / 1.5, 0, 0]]
 
-        xyz = _uv_distance_to_xyz(self.cx, self.cy, self.dist, projection_matrix)
+        xyz = self.get_xyz(projection_matrix)
         world_space_theta = self.theta - math.atan2(xyz[2], xyz[0]) + math.radians(90)
         corners = [_apply_affine_transform(x, theta=world_space_theta, translation=xyz) for x in corners]
         return [apply_projection(x, projection_matrix) for x in corners]
@@ -222,6 +225,93 @@ class Detection25d(Detection):
         for i, j in connections:
             cv2.line(image, corners[i], corners[j], color, lw, LINE_TYPE)
         cv2.circle(image, (int(self.cx), int(self.cy)), 5, color, thickness=2)
+
+        
+class Detection25d_Simplified(Detection):
+    __slots__ = ["class_id", "cx", "y", "dist", "w", "h", "l", "theta"]
+
+    def __init__(self, class_id, cx, y, dist, w, h, l, theta):
+        self.class_id = class_id
+        self.cx = cx
+        self.y = y
+        self.dist = dist
+        self.w = w
+        self.h = h
+        self.l = l
+        self.theta = theta
+
+    def copy(self):
+        return Detection25d_Simplified(self.class_id, self.cx, self.y, self.dist, self.w, self.h, self.l, self.theta)
+
+    def move_image(self, dx, dy):
+        self.cx = self.cx - dx
+
+    def to_2d_detection(self, projection_matrix):
+        corners = self._project_corners(projection_matrix)
+        min_x = 1000000
+        max_x = 0
+        min_y = 1000000
+        max_y = 0
+        for corner in corners:
+            min_x = min(min_x, corner[0][0])
+            max_x = max(max_x, corner[0][0])
+
+            min_y = min(min_y, corner[1][0])
+            max_y = max(max_y, corner[1][0])
+
+        cx = (max_x + min_x) / 2
+        cy = (max_y + min_y) / 2
+        w = max_x - min_x
+        h = max_y - min_y
+
+        return Detection2d(self.class_id, cx, cy, w, h)
+
+    def iou(self, other, projection_matrix=None):
+        if projection_matrix is None:
+            raise RuntimeError("IoU computation not possible without projection matrix.")
+
+        detection2d = self.to_2d_detection(projection_matrix)
+        other2d = other.to_2d_detection(projection_matrix)
+
+        return detection2d.iou(other2d)
+
+    def to_array(self):
+        return [self.class_id, self.cx, self.y, self.dist, self.w, self.h, self.l, self.theta]
+    
+    def get_xyz(self, projection_matrix=None):
+        return _uy_distance_to_xyz(self.cx, self.y, self.dist, projection_matrix)
+
+    def _project_corners(self, projection_matrix=None):
+        corners = [[ self.l / 2.0,  self.h / 2.0,  self.w / 2.0],
+                   [ self.l / 2.0,  self.h / 2.0, -self.w / 2.0],
+                   [-self.l / 2.0,  self.h / 2.0, -self.w / 2.0],
+                   [-self.l / 2.0,  self.h / 2.0,  self.w / 2.0],
+                   [ self.l / 2.0, -self.h / 2.0,  self.w / 2.0],
+                   [ self.l / 2.0, -self.h / 2.0, -self.w / 2.0],
+                   [-self.l / 2.0, -self.h / 2.0, -self.w / 2.0],
+                   [-self.l / 2.0, -self.h / 2.0,  self.w / 2.0],
+                   [self.l / 1.5, 0, 0]]
+
+        xyz = self.get_xyz(projection_matrix)
+        world_space_theta = self.theta - math.atan2(xyz[2], xyz[0]) + math.radians(90)
+        corners = [_apply_affine_transform(x, theta=world_space_theta, translation=xyz) for x in corners]
+        return [apply_projection(x, projection_matrix) for x in corners]
+
+    def visualize(self, image, color, projection_matrix=None):
+        if projection_matrix is None:
+            raise RuntimeError("Visualization not possible without projection matrix.")
+
+        corners = self._project_corners(projection_matrix)
+        corners = [(int(x[0][0]), int(x[1][0])) for x in corners]
+
+        connections = [(1, 2), (3, 0),  # Sides
+                       (5, 6), (7, 4),
+                       (2, 3), (3, 7), (7, 6), (6, 2),  # Back
+                       (0, 1), (1, 5), (5, 4), (4, 0),  # Front
+                       (0, 8), (1, 8), (4, 8), (5, 8)]  # Pointy Nose
+        lw = 2
+        for i, j in connections:
+            cv2.line(image, corners[i], corners[j], color, lw, LINE_TYPE)
 
 
 class Detection3d(Detection):
@@ -300,7 +390,7 @@ def _uv_distance_to_xyz(u, v, distance, projection_matrix):
     beta_2 = (v * t_3 - t_2) / m11
 
     a = 1 + alpha_1 * alpha_1 + alpha_2 * alpha_2
-    b = alpha_1 * beta_1 + alpha_2 * beta_2
+    b = 2 * (alpha_1 * beta_1 + alpha_2 * beta_2)
     c = beta_1 * beta_1 + beta_2 * beta_2 - distance * distance
 
     solution_1, solution_2 = solve_quadratic_equation(a, b, c)
@@ -308,6 +398,27 @@ def _uv_distance_to_xyz(u, v, distance, projection_matrix):
     z = solution_1 if solution_1 > solution_2 else solution_2
     x = alpha_1 * z + beta_1
     y = alpha_2 * z + beta_2
+    return [x, y, z]
+
+
+def _uy_distance_to_xyz(u, y, distance, projection_matrix):
+    m00 = float(projection_matrix[0][0])
+    m02 = float(projection_matrix[0][2])
+    m22 = float(projection_matrix[2][2])
+    t_1 = float(projection_matrix[0][3])
+    t_3 = float(projection_matrix[2][3])
+
+    alpha_1 = (u * m22 - m02) / m00
+    beta_1 = (u * t_3 - t_1) / m00
+
+    a = 1 + alpha_1 * alpha_1
+    b = 2 * (alpha_1 * beta_1)
+    c = beta_1 * beta_1 + y * y - distance * distance
+
+    solution_1, solution_2 = solve_quadratic_equation(a, b, c)
+
+    z = solution_1 if solution_1 > solution_2 else solution_2
+    x = alpha_1 * z + beta_1
     return [x, y, z]
 
 
