@@ -76,7 +76,7 @@ def kitti_detection(base_dir, phase, data_split=10):
     return _gen, (filenames, data_split, phase, base_dir)
 
 
-def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, inline_plotting=False, img_path_prefix=None, min_tresh=0.5, steps=11):
+def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, inline_plotting=False, img_path_prefix=None, min_tresh=0.5, steps=11, allowed_classes=None):
     if NO_IPYTHON:
         print("Inline plotting not availible. Could not find ipython clear_output")
         inline_plotting = False
@@ -102,15 +102,19 @@ def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, in
         i += 1
         calib = feat["calibration"]
         gts = label["detections_2.5d"]
+        if allowed_classes is not None:
+            gts = [d for d in gts if d.class_id in allowed_classes]
         start = time.time()
-        predictor_output = predictor(feat["image"])
+        predictor_output = predictor(feat["image"], calib)
         prediction_time = time.time() - start
         for tresh in treshs:
             start = time.time()
             preds = prediction_2_detections(predictor_output, tresh, calib)
             conversion_time = time.time() - start
             TP, FP, FN = _optimal_assign(preds, gts, calib)
-            recall = len(TP) / (len(TP) + len(FN))
+            recall = 1
+            if len(TP) + len(FN) > 0:
+                recall = len(TP) / (len(TP) + len(FN))
             s_r = 0
             for p in TP:
                 s_r += (1.0 + math.cos(p.a.theta - p.b.theta)) / 2.0
@@ -135,21 +139,57 @@ def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, in
                 for b in FN:
                     b.visualize(image, (128, 0, 0), projection_matrix=calib)
                 plt.clf()
+                fig = plt.figure(figsize=(18, 16), dpi=80, facecolor='w', edgecolor='k')
                 plt.title("TP {} FP {} FN {} Tresh {:.2f}".format(len(TP), len(FP), len(FN), tresh))
                 plt.imshow(image)
                 img_path = "images/{:04d}_{:.2f}.png".format(i, tresh)
                 if img_path_prefix is not None:
                     img_path = os.path.join(img_path_prefix, img_path)
                 plt.savefig(img_path)
-                plt.show()
+
+                # Plot only preds
+                image = feat["image"].copy()
+                for match in TP:
+                    match.a.visualize(image, (0, 255, 0), projection_matrix=calib)
+                for a in FP:
+                    a.visualize(image, (255, 0, 0), projection_matrix=calib)
+                plt.clf()
+                fig = plt.figure(figsize=(18, 16), dpi=80, facecolor='w', edgecolor='k')
+                plt.title("TP {} FP {} Tresh {:.2f}".format(len(TP), len(FP), tresh))
+                plt.imshow(image)
+                img_path = "images/preds_{:04d}_{:.2f}.png".format(i, tresh)
+                if img_path_prefix is not None:
+                    img_path = os.path.join(img_path_prefix, img_path)
+                plt.savefig(img_path)
+
+                # Plot top down view.
+                canvas = np.zeros(shape=(1000, 500, 3), dtype=np.uint8)
+                for match in TP:
+                    match.b.visualize_top_down(canvas, (0, 255, 255), projection_matrix=calib, scale=0.1)
+                    match.a.visualize_top_down(canvas, (0, 255, 0), projection_matrix=calib, scale=0.1)
+                for a in FP:
+                    a.visualize_top_down(canvas, (255, 0, 0), projection_matrix=calib, scale=0.1)
+                for b in FN:
+                    b.visualize_top_down(canvas, (128, 0, 0), projection_matrix=calib, scale=0.1)
+                plt.clf()
+                fig = plt.figure(figsize=(18, 16), dpi=80, facecolor='w', edgecolor='k')
+                plt.title("TP {} FP {} FN {} Tresh {:.2f}".format(len(TP), len(FP), len(FN), tresh))
+                plt.imshow(canvas)
+                img_path = "images/top_down_{:04d}_{:.2f}.png".format(i, tresh)
+                if img_path_prefix is not None:
+                    img_path = os.path.join(img_path_prefix, img_path)
+                plt.savefig(img_path)
         
-        if inline_plotting and i > 0:
+        if i > 0:
             plt.clf()
             plt.title("Recall Curve")
             plt.xlabel("Treshs")
             plt.ylabel("Recall")
             plt.plot(treshs, [sum(recalls[t])/float(len(recalls[t])) for t in treshs])
-            plt.show()
+            img_path = "images/RecallCurve.png"
+            if img_path_prefix is not None:
+                img_path = os.path.join(img_path_prefix, img_path)
+            plt.savefig(img_path)
 
     print("Computing AOS.")
     # Compute mean recalls and mean s_rs
