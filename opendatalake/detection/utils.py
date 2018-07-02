@@ -475,7 +475,7 @@ class Detection3dSimplified(Detection):
         for i, j in connections:
             cv2.line(image, corners[i], corners[j], color, lw, LINE_TYPE)
 
-    def visualize_top_down(self, image, color, scale=0.1):
+    def visualize_top_down(self, image, color, scale=0.1, projection_matrix=None):
         corners = [[self.l / 2.0, self.h / 2.0, self.w / 2.0],
                    [self.l / 2.0, self.h / 2.0, -self.w / 2.0],
                    [-self.l / 2.0, self.h / 2.0, -self.w / 2.0],
