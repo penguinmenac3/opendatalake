@@ -7,8 +7,8 @@ h5py
 pandas
 
 # Dev/Deployment
-sphinx
-sphinx_rtd_theme
-nose
-coverage
-pypi-publisher
+#sphinx
+#sphinx_rtd_theme
+#nose
+#coverage
+#pypi-publisher
