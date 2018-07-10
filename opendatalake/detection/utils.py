@@ -440,7 +440,7 @@ class Detection3dSimplified(Detection):
     def to_array(self):
         return [self.class_id, self.x, self.y, self.z, self.w, self.h, self.l, self.theta, self.conf]
 
-    def get_xyz(self):
+    def get_xyz(self, projection_matrix=None):
         return self.x, self.y, self.z
 
     def _project_corners(self, projection_matrix=None):
