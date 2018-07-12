@@ -12,6 +12,27 @@ except:
     LINE_TYPE = cv2.CV_AA
 
 
+def top_down_overlap(g, p, tresh=0.0, projection_matrix=None):
+    xyz_pred = p.get_xyz(projection_matrix=projection_matrix)
+    xyz_true = g.get_xyz(projection_matrix=projection_matrix)
+
+    theta_pred = p.theta
+    theta_true = g.theta
+
+    dx_raw = (xyz_true[0] - xyz_pred[0])
+    dy_raw = (xyz_true[2] - xyz_pred[2])
+            
+    dx = math.cos(theta_true) * dx_raw + math.sin(theta_true) * dy_raw
+    dy = -math.sin(theta_true) * dx_raw + math.cos(theta_true) * dy_raw
+    dtheta = theta_true - theta_pred
+    l = g.l
+    w = g.w
+            
+    condition = abs(dx) < tresh * l and abs(dy) < tresh * w and abs(dtheta) < tresh * math.radians(90)
+    distance = abs(dx) + abs(dy) + abs(dtheta)
+    return condition, distance, dx, dy, dtheta
+
+
 class Detection(object):
     __metaclass__ = abc.ABCMeta
 
