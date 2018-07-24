@@ -18,7 +18,7 @@ PHASE_VALIDATION = "validation"
 
 
 def _gen(params, stride=1, offset=0, infinite=False):
-    filenames, data_split, phase, base_dir = params
+    filenames, data_split, phase, base_dir, load_depth = params
 
     loop_condition = True
     while loop_condition:
@@ -65,15 +65,37 @@ def _gen(params, stride=1, offset=0, infinite=False):
                                                     theta=float(date[3])))
 
             feature = imread(image, mode="RGB")
-            yield ({"image": feature, "calibration": calibration},
-                   {"detections_2d": detections2d, "detections_2.5d": detections25d})
+            if not load_depth:
+                yield ({"image": feature, "calibration": calibration},
+                       {"detections_2d": detections2d, "detections_2.5d": detections25d})
+            else:
+                if image not in load_depth:
+                    print("Image {} not in depth mapping.".format(image))
+                    continue
+                depth = imread(load_depth[image])
+                yield ({"image": feature, "calibration": calibration},
+                       {"detections_2d": detections2d, "detections_2.5d": detections25d, "depth_image": depth})
         loop_condition = infinite
 
 
-def kitti_detection(base_dir, phase, data_split=10):
+def kitti_detection(base_dir, phase, data_split=10, depth_mapping_file_path=None):
     filenames = [f for f in os.listdir(os.path.join(base_dir, "training", "label_2")) if f.endswith(".txt")]
+    load_depth = False
+    if depth_mapping_file_path is not None:
+        mappings = []
+        with open(depth_mapping_file_path, 'r') as myfile:
+            mappings = myfile.read().strip().split("\n")
+        load_depth = {}
+        for mapping in mappings:
+            same_files = mappings.split(" ")
+            for f in filenames:
+                if os.listdir(os.path.join(base_dir, "training", "label_2", f)) == same_files[0]:
+                    same_image_path = same_files[1]
+                    # TODO implement how to get to the depth path from the image path...
+                    depth_image_path = same_image_path
+                    load_depth[f] = depth_image_path
 
-    return _gen, (filenames, data_split, phase, base_dir)
+    return _gen, (filenames, data_split, phase, base_dir, load_depth)
 
 
 def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, inline_plotting=False, img_path_prefix=None, min_tresh=0.5, steps=11, allowed_classes=None):
