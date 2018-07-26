@@ -69,30 +69,35 @@ def _gen(params, stride=1, offset=0, infinite=False):
                 yield ({"image": feature, "calibration": calibration},
                        {"detections_2d": detections2d, "detections_2.5d": detections25d})
             else:
-                if image not in load_depth:
-                    print("Image {} not in depth mapping.".format(image))
+                if filename not in load_depth:
+                    print("Image {} not in depth mapping.".format(filename))
                     continue
-                depth = imread(load_depth[image])
+                if not os.path.exists(load_depth[filename]):
+                    print("Image {} does not exist as depth image.".format(load_depth[filename]))
+                    continue
+                depth = imread(load_depth[filename])
                 yield ({"image": feature, "calibration": calibration},
-                       {"detections_2d": detections2d, "detections_2.5d": detections25d, "depth_image": depth})
+                       {"detections_2d": detections2d, "detections_2.5d": detections25d, "depth": depth})
         loop_condition = infinite
 
 
-def kitti_detection(base_dir, phase, data_split=10, depth_mapping_file_path=None):
+def kitti_detection(base_dir, phase, data_split=10, depth_mapping_file_path=None, depth_base_dir=None):
     filenames = [f for f in os.listdir(os.path.join(base_dir, "training", "label_2")) if f.endswith(".txt")]
     load_depth = False
-    if depth_mapping_file_path is not None:
+    if depth_mapping_file_path is not None and depth_base_dir is not None:
         mappings = []
         with open(depth_mapping_file_path, 'r') as myfile:
             mappings = myfile.read().strip().split("\n")
         load_depth = {}
         for mapping in mappings:
-            same_files = mappings.split(" ")
+            same_files = mapping.split(" ")
             for f in filenames:
-                if os.listdir(os.path.join(base_dir, "training", "label_2", f)) == same_files[0]:
-                    same_image_path = same_files[1]
-                    # TODO implement how to get to the depth path from the image path...
-                    depth_image_path = same_image_path
+                if os.path.join("data_object_image_2", "training", "image_2", f.replace(".txt", ".png")) == same_files[1]:
+                    same_image_path = same_files[0]
+                    path_parts = same_image_path.split("/")
+                    drive = path_parts[1]
+                    image_name = path_parts[-1]
+                    depth_image_path = os.path.join(depth_base_dir, "train", drive, "proj_depth", "groundtruth", "image_02", image_name)
                     load_depth[f] = depth_image_path
 
     return _gen, (filenames, data_split, phase, base_dir, load_depth)
@@ -287,15 +292,33 @@ if __name__ == "__main__":
     from opendatalake.texture_augmentation import full_texture_augmentation
 
     print("Loading Dataset:")
-    train_data = kitti_detection("datasets/kitti_detection", phase=PHASE_TRAIN)
+    train_data = None
+    depth_mode = False
+    if "--use_depth" in sys.argv:
+        depth_mode = True
+        train_data = kitti_detection("datasets/kitti_detection", phase=PHASE_TRAIN, depth_mapping_file_path="data/kitti_depth_to_raw.txt", depth_base_dir="datasets/kitti_depth")
+    else:
+        train_data = kitti_detection("datasets/kitti_detection", phase=PHASE_TRAIN)
 
     data_fn, data_params = train_data
     data_gen = data_fn(data_params)
 
     for feat, label in data_gen:
+        fig = plt.figure(figsize=(24, 14), dpi=80)
+        if depth_mode:
+            fig.add_subplot(2, 1, 1)
+
+        plt.title("Image")
         img = feat["image"].copy()
         img = full_texture_augmentation(img)
         for detection in label["detections_2.5d"]:
             detection.visualize(img, color=(255, 0, 0), projection_matrix=feat["calibration"])
         plt.imshow(img)
+
+        if depth_mode:
+            fig.add_subplot(2, 1, 2)
+            plt.title("Depth")
+            plt.imshow(label["depth"], cmap="jet")
+            #plt.colorbar()
         plt.show()
+        plt.close(fig)

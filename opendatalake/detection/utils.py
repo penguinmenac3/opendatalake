@@ -726,6 +726,8 @@ def augment_detections(hyper_params, feature, label):
     augmented_feature = {}
     augmented_label = {}
     augmented_feature["image"] = feature["image"].copy()
+    if "depth" in feature:
+        augmented_feature["depth"] = feature["depth"].copy()
     if "calibration" in feature:
         augmented_feature["calibration"] = feature["calibration"]
     augmented_feature["hflipped"] = np.array([0], dtype=np.uint8)
@@ -738,6 +740,8 @@ def augment_detections(hyper_params, feature, label):
         if random.random() < 0.5:
             img_h, img_w, img_c = augmented_feature["image"].shape
             augmented_feature["image"] = np.fliplr(augmented_feature["image"])
+            if "depth" in feature:
+                augmented_feature["depth"] = np.fliplr(augmented_feature["depth"])
             augmented_feature["hflipped"][0] = 1
             hflip_detections(augmented_label, img_w)
 
@@ -747,6 +751,8 @@ def augment_detections(hyper_params, feature, label):
         dy = int(random.random() * 3)
 
         augmented_feature["image"] = crop_image(augmented_feature["image"], dy, dx, img_h - dy, img_w - dx)
+        if "depth" in feature:
+            augmented_feature["depth"] = crop_image(augmented_feature["depth"], dy, dx, img_h - dy, img_w - dx)
         augmented_feature["crop_offset"][0] += dy
         augmented_feature["crop_offset"][1] += dx
 
@@ -774,6 +780,8 @@ def augment_detections(hyper_params, feature, label):
 
         # Crop image
         augmented_feature["image"] = crop_image(augmented_feature["image"], start_y, start_x, target_h, target_w)
+        if "depth" in feature:
+            augmented_feature["depth"] = crop_image(augmented_feature["depth"], start_y, start_x, target_h, target_w)
         augmented_feature["crop_offset"][0] += start_y
         augmented_feature["crop_offset"][1] += start_x
 
