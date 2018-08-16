@@ -33,6 +33,71 @@ def top_down_overlap(g, p, tresh=0.0, projection_matrix=None):
     return condition, distance, dx, dy, dtheta
 
 
+class FusableDetection(object):
+    def __init__(self, detection3dsimplified, conf_weighting=True, only_use_best_n=None):
+        self.x = 0
+        self.y = 0
+        self.z = 0
+        self.w = 0
+        self.h = 0
+        self.l = 0
+        self.theta = 0
+        self.conf = 0
+        self.conf_weighting = conf_weighting
+        self.only_use_best_n = only_use_best_n
+        self.class_id = detection3dsimplified.class_id
+        self.objs = [detection3dsimplified]
+        self.update()
+
+    def update(self):
+        x = 0
+        y = 0
+        z = 0
+        w = 0
+        h = 0
+        l = 0
+        theta_s = 0
+        theta_c = 1
+        weights = 0
+        max_conf = 0
+
+        if self.only_use_best_n is not None:
+            self.objs = sorted(self.objs, key=lambda x: -x.conf)
+        
+        for i, d in enumerate(self.objs):
+            if self.only_use_best_n is not None and self.only_use_best_n <= i:
+                break
+            weight = 1
+            if self.conf_weighting:
+                weight = d.conf
+            x += d.x * weight
+            y += d.y * weight
+            z += d.z * weight
+            w += d.w * weight
+            h += d.h * weight
+            l += d.l * weight
+            theta_s += math.sin(d.theta) * weight
+            theta_c += math.cos(d.theta) * weight
+            weights += weight
+            max_conf = max(max_conf, d.conf)
+
+        self.x = x / weights
+        self.y = y / weights
+        self.z = z / weights
+        self.w = w / weights
+        self.h = h / weights
+        self.l = l / weights
+        self.theta = math.atan2(theta_s, theta_c)
+        self.conf = max_conf        
+
+    def add(self, fusable_detection):
+        self.objs.extend(fusable_detection.objs)
+        self.update()
+
+    def to_detection3d_simplified(self):
+        return Detection3dSimplified(self.objs[0].class_id, self.x, self.y, self.z, self.w, self.h, self.l, self.theta, self.conf)
+        
+
 class Detection(object):
     __metaclass__ = abc.ABCMeta
 
@@ -156,8 +221,8 @@ class Detection2d(Detection):
         cv2.rectangle(image,
                       (int(self.cx - self.w / 2.0), int(self.cy - self.h / 2.0)),
                       (int(self.cx + self.w / 2.0), int(self.cy + self.h / 2.0)),
-                      (color[1], color[0], color[2]),
-                      thickness=1)
+                      (color[0], color[1], color[2]),
+                      thickness=2)
 
 
 class Detection25d(Detection):
