@@ -1,5 +1,4 @@
 import os
-import sys
 import yaml
 import math
 
@@ -26,8 +25,10 @@ COLOR_MAP = {
     "Ignore": (0, 0, 255)
 }
 
+
 class BoschTLR(Sequence):
-    def __init__(self, hyperparams, base_dir, phase, riib=False, preprocess_feature=None, preprocess_label=None, augment_data=None):
+    def __init__(self, hyperparams, phase, riib=False, preprocess_feature=None, preprocess_label=None, augment_data=None):
+        base_dir = hyperparams.problem.data_path
         input_yaml = "train.yaml" if phase == PHASE_TRAIN else "test.yaml"
 
         images = yaml.load(open(os.path.join(base_dir, input_yaml), 'rb').read())
@@ -82,4 +83,5 @@ class BoschTLR(Sequence):
                 label = self.preprocess_label(self.hyperparams, feature, label)
             features.append(feature)
             labels.append(label)
-        return ({k: [dic[k] for dic in features] for k in features[0]}, {k: [dic[k] for dic in labels] for k in labels[0]})
+        return {k: np.array([dic[k] for dic in features]) for k in features[0]},\
+               {k: np.array([dic[k] for dic in labels]) for k in labels[0]}

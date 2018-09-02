@@ -1,44 +1,44 @@
-from tensorflow.examples.tutorials.mnist import input_data
+import math
 import numpy as np
 
-
-def _gen(params, stride=1, offset=0, infinite=False):
-    images, labels = params
-    loop_condition = True
-    while loop_condition:
-        for idx in range(offset, len(images), stride):
-            yield ({"image": images[idx]}, {"probs": labels[idx]})
-        loop_condition = infinite
+from tensorflow.examples.tutorials.mnist import input_data
+from keras.utils import Sequence
 
 
-def mnist(base_dir, phase, prepare_features=None):
-    _mnist = input_data.read_data_sets(base_dir, one_hot=True)
-    if phase == "test":
-        images = _mnist.test.images
-        labels = _mnist.test.labels
-    else:
-        images = _mnist.train.images
-        labels = _mnist.train.labels
+class MNIST(Sequence):
+    def __init__(self, hyperparams, phase, preprocess_feature=None, preprocess_label=None, augment_data=None):
+        _mnist = input_data.read_data_sets(hyperparams.problem.data_path, one_hot=True)
+        if phase == "validation":
+            images = _mnist.test.images
+            labels = _mnist.test.labels
+        else:
+            images = _mnist.train.images
+            labels = _mnist.train.labels
 
-    if prepare_features is not None:
-        images = prepare_features(images)
+        self.images = images
+        self.labels = labels
+        self.hyperparams = hyperparams
+        self.batch_size = hyperparams["train"]["batch_size"]
+        self.preprocess_feature = preprocess_feature
+        self.preprocess_label = preprocess_label
+        self.augment_data = augment_data
 
-    params = (images, labels)
+    def __len__(self):
+        return math.ceil(len(self.images)/self.batch_size)
 
-    return _gen, params
-
-
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    train_data = mnist("data/mnist", "train", lambda x: np.reshape(np.array(x), (-1, 28, 28)))
-
-    data_fn, data_params = train_data
-    data_gen = data_fn(data_params)
-
-    feature, label = next(data_gen)
-    print("Image shape:")
-    print(feature["image"].shape)
-
-    for feature, label in data_gen:
-        plt.imshow(feature["image"])
-        plt.show()
+    def __getitem__(self, index):
+        features = []
+        labels = []
+        for idx in range(index * self.batch_size, min((index + 1) * self.batch_size, len(self))):
+            feature = {"image": np.reshape(self.images[idx], (28, 28))}
+            label = {"probs": self.labels[idx]}
+            if self.augment_data is not None:
+                feature, label = self.augment_data(self.hyperparams, feature, label)
+            if self.preprocess_feature is not None:
+                feature = self.preprocess_feature(self.hyperparams, feature)
+            if self.preprocess_label is not None:
+                label = self.preprocess_label(self.hyperparams, feature, label)
+            features.append(feature)
+            labels.append(label)
+        return {k: np.array([dic[k] for dic in features]) for k in features[0]},\
+               {k: np.array([dic[k] for dic in labels]) for k in labels[0]}
