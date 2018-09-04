@@ -29,7 +29,7 @@ class MNIST(Sequence):
     def __getitem__(self, index):
         features = []
         labels = []
-        for idx in range(index * self.batch_size, min((index + 1) * self.batch_size, len(self))):
+        for idx in range(index * self.batch_size, min((index + 1) * self.batch_size, len(self.images))):
             feature = {"image": np.reshape(self.images[idx], (28, 28))}
             label = {"probs": self.labels[idx]}
             if self.augment_data is not None:
