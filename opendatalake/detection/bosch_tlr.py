@@ -4,7 +4,8 @@ import math
 
 import numpy as np
 from scipy.misc import imread
-from keras.utils import Sequence
+import tensorflow as tf
+Sequence = tf.keras.utils.Sequence
 
 from opendatalake.detection.utils import Detection2d
 
