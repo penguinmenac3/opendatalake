@@ -828,17 +828,23 @@ def augment_detections(hyper_params, feature, label):
 
         move_detections(augmented_label, -dy, -dx)
 
-    if hyper_params.problem.augmentation.get("random_crop", None) is not None and len(augmented_label["detections_2d"]) != 0:
+    if hyper_params.problem.augmentation.get("random_crop", None) is not None:
         img_h, img_w, img_c = augmented_feature["image"].shape
         target_w = hyper_params.problem.augmentation.random_crop.shape.width
         target_h = hyper_params.problem.augmentation.random_crop.shape.height
 
-        idx = random.randint(0, len(augmented_label["detections_2d"]) - 1)
-        detection = augmented_label["detections_2d"][idx]
+        start_x = 0
+        start_y = 0
+        if len(augmented_label["detections_2d"]) != 0:
+            idx = random.randint(0, len(augmented_label["detections_2d"]) - 1)
+            detection = augmented_label["detections_2d"][idx]
+            start_x = int(detection.cx - random.random() * (target_w - 20) / 2.0 - 10)
+            start_y = int(detection.cy - random.random() * (target_h - 20) / 2.0 - 10)
+        else:
+            start_x = int(img_w * random.random())
+            start_y = int(img_h * random.random())
 
         # Compute start point so that crop fit's into image and random crop contains detection
-        start_x = int(detection.cx - random.random() * (target_w - 20) / 2.0 - 10)
-        start_y = int(detection.cy - random.random() * (target_h - 20) / 2.0 - 10)
         if start_x < 0:
             start_x = 0
         if start_y < 0:

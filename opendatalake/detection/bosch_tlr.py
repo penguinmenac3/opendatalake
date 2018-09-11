@@ -56,10 +56,14 @@ class BoschTLR(Sequence):
     def __len__(self):
         return math.ceil(len(self.images)/self.batch_size)
 
+    def get_input_names(self):
+        self.__getitem__(0)
+        return self.input_names
+
     def __getitem__(self, index):
         features = []
         labels = []
-        for idx in range(index * self.batch_size, min((index + 1) * self.batch_size, len(self))):
+        for idx in range(index * self.batch_size, min((index + 1) * self.batch_size, len(self.images))):
             date = self.images[idx]
             feature = imread(date['path'], mode="RGB")
             detections2d = []
@@ -74,15 +78,22 @@ class BoschTLR(Sequence):
                                                 cy=(box['y_min'] + box['y_max']) / 2.0,
                                                 w=box['x_max'] - box['x_min'],
                                                 h=box['y_max'] - box['y_min']))
-            feature = {"image": feature}
-            label = {"detections_2d": detections2d}
-            if self.augment_data is not None:
-                feature, label = self.augment_data(self.hyperparams, feature, label)
-            if self.preprocess_feature is not None:
-                feature = self.preprocess_feature(self.hyperparams, feature)
-            if self.preprocess_label is not None:
-                label = self.preprocess_label(self.hyperparams, feature, label)
-            features.append(feature)
-            labels.append(label)
-        return {k: np.array([dic[k] for dic in features]) for k in features[0]},\
+            feature_dict = None
+            label_dict = None
+            for i in range(10):
+                feature_dict = {"image": feature}
+                label_dict = {"detections_2d": detections2d}
+                is_bad = False
+                if self.augment_data is not None:
+                    feature_dict, label_dict = self.augment_data(self.hyperparams, feature_dict, label_dict)
+                if self.preprocess_feature is not None:
+                    feature_dict, is_bad = self.preprocess_feature(self.hyperparams, feature_dict)
+                if self.preprocess_label is not None and not is_bad:
+                    label_dict, is_bad = self.preprocess_label(self.hyperparams, feature_dict, label_dict)
+                if not is_bad:
+                    break
+            features.append(feature_dict)
+            labels.append(label_dict)
+        self.input_names = list(features[0].keys())
+        return {k: np.array([dic[k] for dic in features]) for k in self.input_names},\
                {k: np.array([dic[k] for dic in labels]) for k in labels[0]}
