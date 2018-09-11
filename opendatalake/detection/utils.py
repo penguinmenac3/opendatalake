@@ -12,6 +12,11 @@ except:
     LINE_TYPE = cv2.CV_AA
 
 
+def modulus_ring(val, lower, upper):
+    mod_range = upper - lower
+    return ((val - lower) % mod_range) + lower
+
+
 def top_down_overlap(g, p, tresh=0.0, projection_matrix=None):
     xyz_pred = p.get_xyz(projection_matrix=projection_matrix)
     xyz_true = g.get_xyz(projection_matrix=projection_matrix)
@@ -21,13 +26,13 @@ def top_down_overlap(g, p, tresh=0.0, projection_matrix=None):
 
     dx_raw = (xyz_true[0] - xyz_pred[0])
     dy_raw = (xyz_true[2] - xyz_pred[2])
-            
+
     dx = math.cos(theta_true) * dx_raw + math.sin(theta_true) * dy_raw
     dy = -math.sin(theta_true) * dx_raw + math.cos(theta_true) * dy_raw
-    dtheta = theta_true - theta_pred
+    dtheta = modulus_ring(theta_true - theta_pred, -math.pi, math.pi)
     l = g.l
     w = g.w
-            
+
     condition = abs(dx) < tresh * l and abs(dy) < tresh * w and abs(dtheta) < tresh * math.radians(90)
     distance = abs(dx) + abs(dy) + abs(dtheta)
     return condition, distance, dx, dy, dtheta
@@ -63,7 +68,7 @@ class FusableDetection(object):
 
         if self.only_use_best_n is not None:
             self.objs = sorted(self.objs, key=lambda x: -x.conf)
-        
+
         for i, d in enumerate(self.objs):
             if self.only_use_best_n is not None and self.only_use_best_n <= i:
                 break
@@ -88,7 +93,7 @@ class FusableDetection(object):
         self.h = h / weights
         self.l = l / weights
         self.theta = math.atan2(theta_s, theta_c)
-        self.conf = max_conf        
+        self.conf = max_conf
 
     def add(self, fusable_detection):
         self.objs.extend(fusable_detection.objs)
@@ -96,7 +101,7 @@ class FusableDetection(object):
 
     def to_detection3d_simplified(self):
         return Detection3dSimplified(self.objs[0].class_id, self.x, self.y, self.z, self.w, self.h, self.l, self.theta, self.conf)
-        
+
 
 class Detection(object):
     __metaclass__ = abc.ABCMeta
@@ -285,7 +290,7 @@ class Detection25d(Detection):
 
     def get_xyz(self, projection_matrix=None):
         return _uv_distance_to_xyz(self.cx, self.cy, self.dist, projection_matrix)
-    
+
     def _project_corners(self, projection_matrix=None):
         corners = [[ self.l / 2.0,  self.h / 2.0,  self.w / 2.0],
                    [ self.l / 2.0,  self.h / 2.0, -self.w / 2.0],
@@ -348,7 +353,7 @@ class Detection25d(Detection):
         for i, j in connections:
             cv2.line(image, corners[i], corners[j], color, lw, LINE_TYPE)
 
-        
+
 class Detection25dSimplified(Detection):
     __slots__ = ["class_id", "cx", "y", "dist", "w", "h", "l", "theta", "conf"]
 
@@ -405,7 +410,7 @@ class Detection25dSimplified(Detection):
 
     def to_array(self):
         return [self.class_id, self.cx, self.y, self.dist, self.w, self.h, self.l, self.theta, self.conf]
-    
+
     def get_xyz(self, projection_matrix=None):
         return _uy_distance_to_xyz(self.cx, self.y, self.dist, projection_matrix)
 
@@ -784,7 +789,7 @@ def augment_detections(hyper_params, feature, label):
     # 1) Rotation is not possible
     # 3) Scaling is not possible, because it ruins depth perception
     # However, random crops can improve performance. (Training speed and accuracy)
-    if hyper_params.problem.get_or_default("augmentation", None) is None:
+    if hyper_params.problem.get("augmentation", None) is None:
         return feature, label
 
     img_h, img_w, img_c = feature["image"].shape
@@ -801,7 +806,7 @@ def augment_detections(hyper_params, feature, label):
     for k in label.keys():
         augmented_label[k] = [detection.copy() for detection in label[k]]
 
-    if hyper_params.problem.augmentation.get_or_default("enable_horizontal_flip", False):
+    if hyper_params.problem.augmentation.get("enable_horizontal_flip", False):
         if random.random() < 0.5:
             img_h, img_w, img_c = augmented_feature["image"].shape
             augmented_feature["image"] = np.fliplr(augmented_feature["image"])
@@ -810,7 +815,7 @@ def augment_detections(hyper_params, feature, label):
             augmented_feature["hflipped"][0] = 1
             hflip_detections(augmented_label, img_w)
 
-    if hyper_params.problem.augmentation.get_or_default("enable_micro_translation", False):
+    if hyper_params.problem.augmentation.get("enable_micro_translation", False):
         img_h, img_w, img_c = augmented_feature["image"].shape
         dx = int(random.random() * 3)
         dy = int(random.random() * 3)
@@ -823,7 +828,7 @@ def augment_detections(hyper_params, feature, label):
 
         move_detections(augmented_label, -dy, -dx)
 
-    if hyper_params.problem.augmentation.get_or_default("random_crop", None) is not None and len(augmented_label["detections_2d"]) != 0:
+    if hyper_params.problem.augmentation.get("random_crop", None) is not None and len(augmented_label["detections_2d"]) != 0:
         img_h, img_w, img_c = augmented_feature["image"].shape
         target_w = hyper_params.problem.augmentation.random_crop.shape.width
         target_h = hyper_params.problem.augmentation.random_crop.shape.height
@@ -853,7 +858,7 @@ def augment_detections(hyper_params, feature, label):
         # Crop labels
         move_detections(augmented_label, -start_y, -start_x)
 
-    if hyper_params.problem.augmentation.get_or_default("enable_texture_augmentation", False):
+    if hyper_params.problem.augmentation.get("enable_texture_augmentation", False):
         if random.random() < 0.5:
             augmented_feature["image"] = full_texture_augmentation(augmented_feature["image"])
 
