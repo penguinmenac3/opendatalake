@@ -54,11 +54,7 @@ class BoschTLR(Sequence):
         self.augment_data = augment_data
 
     def __len__(self):
-        return math.ceil(len(self.images)/self.batch_size)
-
-    def get_input_names(self):
-        self.__getitem__(0)
-        return self.input_names
+        return math.floor(len(self.images)/self.batch_size)
 
     def __getitem__(self, index):
         features = []
@@ -94,6 +90,6 @@ class BoschTLR(Sequence):
                     break
             features.append(feature_dict)
             labels.append(label_dict)
-        self.input_names = list(features[0].keys())
-        return {k: np.array([dic[k] for dic in features]) for k in self.input_names},\
+        input_tensor_order = sorted(list(features[0].keys()))
+        return {k: np.array([dic[k] for dic in features]) for k in input_tensor_order},\
                {k: np.array([dic[k] for dic in labels]) for k in labels[0]}
