@@ -206,7 +206,7 @@ def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, in
                 if img_path_prefix is not None:
                     img_path = os.path.join(img_path_prefix, img_path)
                 plt.savefig(img_path)
-        
+
         if i > 0:
             plt.clf()
             plt.title("Recall Curve")

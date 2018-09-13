@@ -62,7 +62,7 @@ class FusableDetection(object):
         h = 0
         l = 0
         theta_s = 0
-        theta_c = 1
+        theta_c = 0
         weights = 0
         max_conf = 0
 
