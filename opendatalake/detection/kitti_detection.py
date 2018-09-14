@@ -79,7 +79,7 @@ class KittiDetection(Sequence):
     def __getitem__(self, index):
         features = []
         labels = []
-        for idx in range(index * self.batch_size, min((index + 1) * self.batch_size, len(self.images))):
+        for idx in range(index * self.batch_size, min((index + 1) * self.batch_size, len(self.filenames))):
             filename = self.filenames[idx]
             image = os.path.join(self.base_dir, "data_object_image_2", "training", "image_2",
                                  filename.replace(".txt", ".png"))
@@ -118,17 +118,15 @@ class KittiDetection(Sequence):
             feature = imread(image, mode="RGB")
             feature_dict = None
             label_dict = None
-            if not self.load_depth:
-                feature_dict = {"image": feature, "calibration": calibration}
-                label_dict = {"detections_2d": detections2d, "detections_2.5d": detections25d}
-            else:
-                depth = imread(self.load_depth[filename])
-                feature_dict = {"image": feature, "calibration": calibration}
-                label_dict = {"detections_2d": detections2d, "detections_2.5d": detections25d, "depth": depth}
-
             for i in range(10):
-                feature_dict = {"image": feature}
-                label_dict = {"detections_2d": detections2d}
+                if not self.load_depth:
+                    feature_dict = {"image": feature, "calibration": calibration}
+                    label_dict = {"detections_2d": detections2d, "detections_2.5d": detections25d}
+                else:
+                    depth = imread(self.load_depth[filename])
+                    feature_dict = {"image": feature, "calibration": calibration}
+                    label_dict = {"detections_2d": detections2d, "detections_2.5d": detections25d, "depth": depth}
+
                 is_bad = False
                 if self.augment_data is not None:
                     feature_dict, label_dict = self.augment_data(self.hyperparams, feature_dict, label_dict)
