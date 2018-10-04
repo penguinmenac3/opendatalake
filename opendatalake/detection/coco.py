@@ -5,6 +5,10 @@ import sys
 from scipy.misc import imread
 import numpy as np
 
+from StringIO import StringIO
+from zipfile import ZipFile
+from urllib import urlopen
+
 PYTHON_VERSION = sys.version_info[0]
 if PYTHON_VERSION == 2:
     from urllib import urlretrieve
@@ -17,6 +21,9 @@ from opendatalake.detection.utils import Detection25d, Detection2d, apply_projec
 Sequence = tf.keras.utils.Sequence
 PHASE_TRAIN = "train"
 PHASE_VALIDATION = "validation"
+
+COCO2014_ANNOTATIONS_URL = "http://images.cocodataset.org/annotations/annotations_trainval2014.zip"
+COCO2017_ANNOTATIONS_URL = "http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
 
 DATASETS = ["val2014", "val2017", "train2014", "train2017"]
 
@@ -35,6 +42,17 @@ class COCO(Sequence):
 
         # If data does not exist download it.
         if not os.path.exists(annotation_file):
+            if not os.path.exists(self.base_dir + "/trainval2014.zip"):
+                urlretrieve(COCO2014_ANNOTATIONS_URL, self.base_dir + "/trainval2014.zip")
+                zip_ref = zipfile.ZipFile(self.base_dir + "/trainval2014.zip", 'r')
+                zip_ref.extractall(self.base_dir)
+                zip_ref.close()
+            if not os.path.exists(self.base_dir + "/trainval2017.zip"):
+                urlretrieve(COCO2017_ANNOTATIONS_URL, self.base_dir + "/trainval2017.zip")
+                zip_ref = zipfile.ZipFile(self.base_dir + "/trainval2017.zip", 'r')
+                zip_ref.extractall(self.base_dir)
+                zip_ref.close()
+            
             for dataset in DATASETS:
                 print("Download: " + dataset)
                 self._download(data_type=dataset, data_dir=self.base_dir)
