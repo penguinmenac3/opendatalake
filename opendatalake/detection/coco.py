@@ -5,9 +5,7 @@ import sys
 from scipy.misc import imread
 import numpy as np
 
-from StringIO import StringIO
 from zipfile import ZipFile
-from urllib import urlopen
 
 PYTHON_VERSION = sys.version_info[0]
 if PYTHON_VERSION == 2:
@@ -43,13 +41,17 @@ class COCO(Sequence):
         # If data does not exist download it.
         if not os.path.exists(annotation_file):
             if not os.path.exists(self.base_dir + "/trainval2014.zip"):
+                print("Download: " + COCO2014_ANNOTATIONS_URL)
                 urlretrieve(COCO2014_ANNOTATIONS_URL, self.base_dir + "/trainval2014.zip")
-                zip_ref = zipfile.ZipFile(self.base_dir + "/trainval2014.zip", 'r')
+                print("Extracting: {}/trainval2014.zip".format(self.base_dir))
+                zip_ref = ZipFile(self.base_dir + "/trainval2014.zip", 'r')
                 zip_ref.extractall(self.base_dir)
                 zip_ref.close()
             if not os.path.exists(self.base_dir + "/trainval2017.zip"):
+                print("Download: " + COCO2017_ANNOTATIONS_URL)
                 urlretrieve(COCO2017_ANNOTATIONS_URL, self.base_dir + "/trainval2017.zip")
-                zip_ref = zipfile.ZipFile(self.base_dir + "/trainval2017.zip", 'r')
+                print("Extracting: {}/trainval2017.zip".format(self.base_dir))
+                zip_ref = ZipFile(self.base_dir + "/trainval2017.zip", 'r')
                 zip_ref.extractall(self.base_dir)
                 zip_ref.close()
             
