@@ -100,7 +100,7 @@ class COCO(Sequence):
         return {k: np.array([dic[k] for dic in features]) for k in input_tensor_order},\
                {k: np.array([dic[k] for dic in labels]) for k in labels[0]}
 
-    def _download(data_type, data_dir="data/coco"):
+    def _download(self, data_type, data_dir="data/coco"):
         annotation_file = '{}/annotations/instances_{}.json'.format(data_dir, data_type)
         tar_dir = '%s/images/%s' % (data_dir, data_type)
         print("Loading annotation file: " + annotation_file)
