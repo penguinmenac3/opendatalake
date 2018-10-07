@@ -191,10 +191,13 @@ class Detection2d(Detection):
         self.cx = self.cx - dx
         self.cy = self.cy - dy
         if self.instance_mask is not None:
+            self.instance_mask = list(self.instance_mask)
             for j in range(len(self.instance_mask)):
-                for i in range(len(self.instance_mask[j]) / 2):
-                    self.instance_mask[j][2 * i + 0] = self.instance_mask[j][2 * i + 0] - dx
-                    self.instance_mask[j][2 * i + 1] = self.instance_mask[j][2 * i + 1] - dy
+                self.instance_mask[j] = list(self.instance_mask[j])
+                for i in range(int(len(self.instance_mask[j]) / 2)):
+                    if type(self.instance_mask[j][2 * i + 0]) != str:
+                        self.instance_mask[j][2 * i + 0] = self.instance_mask[j][2 * i + 0] - dx
+                        self.instance_mask[j][2 * i + 1] = self.instance_mask[j][2 * i + 1] - dy
 
     def copy(self):
         return Detection2d(self.class_id, self.cx, self.cy, self.w, self.h, self.theta, self.conf, self.instance_mask)
@@ -228,7 +231,7 @@ class Detection2d(Detection):
     def to_array(self):
         return [self.class_id, self.cx, self.cy, self.w, self.h, self.theta, self.conf, self.instance_mask]
 
-    def create_instance_mask(image_shape, color=255):
+    def create_instance_mask(self, image_shape, color=255):
         mask = np.zeros(image_shape)
         cv2.fillPoly(mask, self._instance_mask_to_cv_pts(), color)
         return mask
@@ -239,10 +242,12 @@ class Detection2d(Detection):
         for poly in self.instance_mask:
             pts = []
             for i in range(int(len(poly)/ 2)):
-                pt = (int(poly[2 * i + 0]), int(poly[2 * i + 1]))
-                pts.append(pt)
+                if type(poly[2 * i + 0]) != str:
+                    pt = (int(poly[2 * i + 0]), int(poly[2 * i + 1]))
+                    pts.append(pt)
 
-            polys.append(np.array(pts))
+            if len(pts) > 0:
+                polys.append(np.array(pts))
         return polys
 
     def visualize(self, image, color=None, color_map=None, class_id_map=None):
@@ -776,8 +781,7 @@ def move_detections(label, dy, dx):
         if k.startswith("detection"):
             detections = label[k]
             for detection in detections:
-                detection.cy += dy
-                detection.cx += dx
+                detection.move_image(-dx, -dy)
 
 
 def hflip_detections(label, w):
@@ -875,6 +879,14 @@ def augment_detections(hyper_params, feature, label):
         img_h, img_w, img_c = augmented_feature["image"].shape
         target_w = hyper_params.problem.augmentation.random_crop.shape.width
         target_h = hyper_params.problem.augmentation.random_crop.shape.height
+
+        delta_x = max(int(math.ceil((target_w + 1 - img_w) / 2)), 0)
+        delta_y = max(int(math.ceil((target_h + 1 - img_h) / 2)), 0)
+        move_detections(augmented_label, delta_y, delta_x)
+        augmented_feature["image"] = cv2.copyMakeBorder(augmented_feature["image"],
+                                                        delta_y, delta_y, delta_x, delta_x,
+                                                        cv2.BORDER_CONSTANT)
+        img_h, img_w, img_c = augmented_feature["image"].shape
 
         start_x = 0
         start_y = 0

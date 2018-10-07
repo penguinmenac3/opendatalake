@@ -2,6 +2,7 @@ import json
 import time
 import os
 import sys
+import math
 from scipy.misc import imread
 import numpy as np
 
@@ -69,14 +70,15 @@ class COCO(Sequence):
 
             detections2d = []
             instance_masks = []
-            for annotation in self.annotations[image_id]:
-                class_id = annotation["category_id"]
-                w = annotation["bbox"][2]
-                h = annotation["bbox"][3]
-                cx = annotation["bbox"][0] + w / 2
-                cy = annotation["bbox"][1] + h / 2
-                mask = list(annotation["segmentation"])
-                detections2d.append(Detection2d(class_id, cx, cy, w, h, conf=1.0, instance_mask=mask))
+            if image_id in self.annotations:
+                for annotation in self.annotations[image_id]:
+                    class_id = annotation["category_id"]
+                    w = annotation["bbox"][2]
+                    h = annotation["bbox"][3]
+                    cx = annotation["bbox"][0] + w / 2
+                    cy = annotation["bbox"][1] + h / 2
+                    mask = list(annotation["segmentation"])
+                    detections2d.append(Detection2d(class_id, cx, cy, w, h, conf=1.0, instance_mask=mask))
 
             feature = imread(filename, mode="RGB")
             feature_dict = None
