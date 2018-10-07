@@ -137,11 +137,18 @@ class COCO(Sequence):
         print("Number of images: " + str(N))
         i = 0
         for img in imgs.values():
-            tic = time.time()
-            filename = '%s/images/%s/%s' % (data_dir, data_type, img['file_name'])
-            if not os.path.exists(filename):
-                urlretrieve(img['coco_url'], filename)
-            print('downloaded {}/{} images (t={:0.1f}s)'.format(i, N, time.time()- tic))
+            err = True
+            while err:
+                tic = time.time()
+                try:
+                    filename = '%s/images/%s/%s' % (data_dir, data_type, img['file_name'])
+                    if not os.path.exists(filename):
+                        urlretrieve(img['coco_url'], filename)
+                    err = False
+                except IOError:
+                    print("IOError retrying.")
+                    continue
+                print('downloaded {}/{} images (t={:0.1f}s)'.format(i, N, time.time()- tic))
             i += 1
 
 if __name__ == "__main__":
