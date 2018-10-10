@@ -29,8 +29,8 @@ DATASETS = ["val2014", "val2017", "train2014", "train2017"]
 
 class COCO(Sequence):
     def __init__(self, hyperparams, phase, preprocess_feature=None, preprocess_label=None, augment_data=None):
-        self.base_dir = hyperparams.problem.data_path
-        self.batch_size = hyperparams.train.batch_size
+        self.base_dir = hyperparams.problem.get("data_path", "datasets/coco")
+        self.batch_size = hyperparams.train.get("batch_size", 16)
         self.phase = phase
         self.hyperparams = hyperparams
         self.preprocess_feature = preprocess_feature
@@ -145,6 +145,3 @@ class COCO(Sequence):
                 urlretrieve(img['coco_url'], filename)
             print('downloaded {}/{} images (t={:0.1f}s)'.format(i, N, time.time()- tic))
             i += 1
-
-if __name__ == "__main__":
-    download_all()
