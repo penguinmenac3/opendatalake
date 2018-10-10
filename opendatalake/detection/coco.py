@@ -1,10 +1,13 @@
+from __future__ import print_function
+
 import json
 import time
 import os
 import sys
+import math
 from scipy.misc import imread
 import numpy as np
-
+from PIL import Image
 from zipfile import ZipFile
 
 PYTHON_VERSION = sys.version_info[0]
@@ -54,7 +57,7 @@ class COCO(Sequence):
                 zip_ref = ZipFile(self.base_dir + "/trainval2017.zip", 'r')
                 zip_ref.extractall(self.base_dir)
                 zip_ref.close()
-            
+
             for dataset in DATASETS:
                 print("Download: " + dataset)
                 self._download(data_type=dataset, data_dir=self.base_dir)
@@ -148,8 +151,32 @@ class COCO(Sequence):
                 except IOError:
                     print("IOError retrying.")
                     continue
-                print('downloaded {}/{} images (t={:0.1f}s)'.format(i, N, time.time()- tic))
+                print('downloaded {}/{} images (t={:0.1f}s)'.format(i, N, time.time()- tic), end="\r")
             i += 1
 
-if __name__ == "__main__":
-    download_all()
+    def verify_integrity(self, auto_repair=False):
+        N = len(self.dataset["images"])
+        errorous_images = []
+        for idx in range(N):
+            filename = '%s/images/%s/%s' % (self.base_dir, self.phase, self.dataset['images'][idx]['file_name'])
+            err = False
+            try:
+                image = np.asarray(Image.open(filename).convert('RGB'))
+                image = image[:, :, ::-1]
+            except IOError:
+                errorous_images.append(filename)
+                print("Found broken image: {}".format(filename))
+                err = True
+            while err and auto_repair:
+                tic = time.time()
+                try:
+                    if os.path.exists(filename):
+                        os.remove(filename)
+                    urlretrieve(self.dataset['images'][idx]['coco_url'], filename)
+                    err = False
+                except IOError:
+                    print("IOError retrying.")
+                    continue
+                print('Repaired image {} (t={:0.1f}s)'.format(idx, time.time() - tic))
+            print('Checked {}/{} images'.format(idx, N), end="\r")
+        return errorous_images
