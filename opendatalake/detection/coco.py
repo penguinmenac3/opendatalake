@@ -6,6 +6,8 @@ import math
 from scipy.misc import imread
 import numpy as np
 
+from zipfile import ZipFile
+
 PYTHON_VERSION = sys.version_info[0]
 if PYTHON_VERSION == 2:
     from urllib import urlretrieve
@@ -18,6 +20,9 @@ from opendatalake.detection.utils import Detection25d, Detection2d, apply_projec
 Sequence = tf.keras.utils.Sequence
 PHASE_TRAIN = "train"
 PHASE_VALIDATION = "validation"
+
+COCO2014_ANNOTATIONS_URL = "http://images.cocodataset.org/annotations/annotations_trainval2014.zip"
+COCO2017_ANNOTATIONS_URL = "http://images.cocodataset.org/annotations/annotations_trainval2017.zip"
 
 DATASETS = ["val2014", "val2017", "train2014", "train2017"]
 
@@ -36,6 +41,21 @@ class COCO(Sequence):
 
         # If data does not exist download it.
         if not os.path.exists(annotation_file):
+            if not os.path.exists(self.base_dir + "/trainval2014.zip"):
+                print("Download: " + COCO2014_ANNOTATIONS_URL)
+                urlretrieve(COCO2014_ANNOTATIONS_URL, self.base_dir + "/trainval2014.zip")
+                print("Extracting: {}/trainval2014.zip".format(self.base_dir))
+                zip_ref = ZipFile(self.base_dir + "/trainval2014.zip", 'r')
+                zip_ref.extractall(self.base_dir)
+                zip_ref.close()
+            if not os.path.exists(self.base_dir + "/trainval2017.zip"):
+                print("Download: " + COCO2017_ANNOTATIONS_URL)
+                urlretrieve(COCO2017_ANNOTATIONS_URL, self.base_dir + "/trainval2017.zip")
+                print("Extracting: {}/trainval2017.zip".format(self.base_dir))
+                zip_ref = ZipFile(self.base_dir + "/trainval2017.zip", 'r')
+                zip_ref.extractall(self.base_dir)
+                zip_ref.close()
+            
             for dataset in DATASETS:
                 print("Download: " + dataset)
                 self._download(data_type=dataset, data_dir=self.base_dir)
@@ -102,7 +122,7 @@ class COCO(Sequence):
         return {k: np.array([dic[k] for dic in features]) for k in input_tensor_order},\
                {k: np.array([dic[k] for dic in labels]) for k in labels[0]}
 
-    def _download(data_type, data_dir="data/coco"):
+    def _download(self, data_type, data_dir="data/coco"):
         annotation_file = '{}/annotations/instances_{}.json'.format(data_dir, data_type)
         tar_dir = '%s/images/%s' % (data_dir, data_type)
         print("Loading annotation file: " + annotation_file)
