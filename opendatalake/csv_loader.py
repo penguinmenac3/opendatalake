@@ -1,28 +1,24 @@
 import pandas as pd
 
+from opendatalake.simple_sequence import SimpleSequence
 
-def _gen(params, stride=1, offset=0, infinite=False):
-    features, labels, prepare_features, prepare_labels = params
 
-    loop_condition = True
-    while loop_condition:
-        for idx in range(offset, len(features), stride):
-            feature = features[idx]
-            if prepare_features:
-                feature = prepare_features(feature)
-            label = labels[idx]
-            if prepare_labels:
-                label = prepare_labels(label)
-            yield ({"feature": feature}, {"label": label})
-        loop_condition = infinite
+class CSV(SimpleSequence):
+    def __init__(self, hyperparams, phase, preprocess_fn=None, augmentation_fn=None):
+        super(CSV, self).__init__(hyperparams, phase, preprocess_fn, augmentation_fn)
+        file_name = hyperparams.problem.filename
+        feature_name_list = hyperparams.problem.feature_name_list
+        label_name_list = hyperparams.problem.label_name_list
+        df = pd.read_csv(file_name)
 
-def load_csv(file_name, feature_name_list=[], label_name_list=[], prepare_features=None, prepare_labels=None):
-    df = pd.read_csv(file_name)
+        self.features = df.loc[:, feature_name_list].values
+        self.labels = df.loc[:, label_name_list].values
 
-    features = df.loc[:, feature_name_list].values
-    labels = df.loc[:, label_name_list].values
+    def __num_samples(self):
+        return len(features)
 
-    return _gen, (features, labels, prepare_features, prepare_labels)
+    def __get_sample(self, idx):
+        return {"feature": features[idx]}, {"label": labels[idx]}
 
 
 if __name__ == "__main__":
