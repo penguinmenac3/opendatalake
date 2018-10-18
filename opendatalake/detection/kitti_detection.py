@@ -1,9 +1,10 @@
 import os
-import sys
 import time
 import math
+
 import numpy as np
 from scipy.misc import imread
+
 import matplotlib.pyplot as plt
 try:
     from IPython.display import clear_output
@@ -11,35 +12,85 @@ try:
 except ModuleNotFoundError:
     NO_IPYTHON = True
 
+import tensorflow as tf
 from opendatalake.detection.utils import Detection25d, Detection2d, apply_projection, vec_len
 
+Sequence = tf.keras.utils.Sequence
 PHASE_TRAIN = "train"
 PHASE_VALIDATION = "validation"
 
 
-def _gen(params, stride=1, offset=0, infinite=False):
-    filenames, data_split, phase, base_dir, load_depth = params
+class KittiDetection(Sequence):
+    def __init__(self, hyperparams, phase, preprocess_feature=None, preprocess_label=None, augment_data=None):
+        data_split = hyperparams.problem.get("data_split", 10)
+        depth_mapping_file_path = hyperparams.problem.get("depth_mapping_file_path", None)
+        depth_base_dir = hyperparams.problem.get("depth_base_dir", None)
+        base_dir = hyperparams.problem.data_path
+        filenames = [f for f in os.listdir(os.path.join(base_dir, "training", "label_2")) if f.endswith(".txt")]
+        load_depth = False
+        if depth_mapping_file_path is not None and depth_base_dir is not None:
+            mappings = []
+            with open(depth_mapping_file_path, 'r') as myfile:
+                mappings = myfile.read().strip().split("\n")
+            load_depth = {}
+            for mapping in mappings:
+                same_files = mapping.split(" ")
+                for f in filenames:
+                    if os.path.join("data_object_image_2", "training", "image_2", f.replace(".txt", ".png")) == same_files[1]:
+                        same_image_path = same_files[0]
+                        path_parts = same_image_path.split("/")
+                        drive = path_parts[1]
+                        image_name = path_parts[-1]
+                        depth_image_path = os.path.join(depth_base_dir, "train", drive, "proj_depth", "groundtruth", "image_02", image_name)
+                        load_depth[f] = depth_image_path
 
-    loop_condition = True
-    while loop_condition:
-        for idx in range(offset, len(filenames), stride):
-            filename = filenames[idx]
-            image = os.path.join(base_dir, "data_object_image_2", "training", "image_2",
-                                       filename.replace(".txt", ".png"))
-
-            calibration_file = os.path.join(base_dir, "data_object_calib", "training", "calib", filename)
-            calibration = np.genfromtxt(calibration_file, delimiter=' ', usecols=range(1, 13), skip_footer=3)
-            calibration = calibration[2].reshape(3, 4)
-
-            with open(os.path.join(base_dir, "training", "label_2", filename), 'r') as myfile:
-                data = myfile.read().strip().split("\n")
-                # Pedestrian 0.00 0 -0.20 712.40 143.00 810.73 307.92 1.89 0.48 1.20 1.84 1.47 8.41 0.01
-
+        self.filenames = []
+        for idx, filename in enumerate(filenames):
             if data_split and idx % data_split == 0 and phase == PHASE_TRAIN:
                 continue
 
             if data_split and idx % data_split != 0 and phase == PHASE_VALIDATION:
                 continue
+
+            if not load_depth:
+                pass
+            else:
+                if filename not in load_depth:
+                    print("Image {} not in depth mapping.".format(filename))
+                    continue
+                if not os.path.exists(load_depth[filename]):
+                    print("Image {} does not exist as depth image.".format(load_depth[filename]))
+                    continue
+            self.filenames.append(filename)
+
+        self.base_dir = base_dir
+        self.filenames = filenames
+        self.phase = phase
+        self.load_depth = load_depth
+        self.hyperparams = hyperparams
+        self.batch_size = hyperparams.train.batch_size
+        self.preprocess_feature = preprocess_feature
+        self.preprocess_label = preprocess_label
+        self.augment_data = augment_data
+
+    def __len__(self):
+        return math.floor(len(self.filenames)/self.batch_size)
+
+    def __getitem__(self, index):
+        features = []
+        labels = []
+        for idx in range(index * self.batch_size, min((index + 1) * self.batch_size, len(self.filenames))):
+            filename = self.filenames[idx]
+            image = os.path.join(self.base_dir, "data_object_image_2", "training", "image_2",
+                                 filename.replace(".txt", ".png"))
+
+            calibration_file = os.path.join(self.base_dir, "data_object_calib", "training", "calib", filename)
+            calibration = np.genfromtxt(calibration_file, delimiter=' ', usecols=range(1, 13), skip_footer=3)
+            calibration = calibration[2].reshape(3, 4)
+
+            with open(os.path.join(self.base_dir, "training", "label_2", filename), 'r') as myfile:
+                data = myfile.read().strip().split("\n")
+                # Pedestrian 0.00 0 -0.20 712.40 143.00 810.73 307.92 1.89 0.48 1.20 1.84 1.47 8.41 0.01
 
             detections2d = []
             detections25d = []
@@ -60,57 +111,45 @@ def _gen(params, stride=1, offset=0, infinite=False):
                 projected_center = apply_projection(center, calibration)
                 dist = vec_len(center)
                 detections25d.append(Detection25d(class_id=date[0],
-                                                    cx=projected_center[0][0], cy=projected_center[1][0], dist=dist,
-                                                    w=float(date[9]), h=float(date[8]), l=float(date[10]),
-                                                    theta=float(date[3])))
+                                                  cx=projected_center[0][0], cy=projected_center[1][0], dist=dist,
+                                                  w=float(date[9]), h=float(date[8]), l=float(date[10]),
+                                                  theta=float(date[3])))
 
             feature = imread(image, mode="RGB")
-            if not load_depth:
-                yield ({"image": feature, "calibration": calibration},
-                       {"detections_2d": detections2d, "detections_2.5d": detections25d})
-            else:
-                if filename not in load_depth:
-                    print("Image {} not in depth mapping.".format(filename))
-                    continue
-                if not os.path.exists(load_depth[filename]):
-                    print("Image {} does not exist as depth image.".format(load_depth[filename]))
-                    continue
-                depth = imread(load_depth[filename])
-                yield ({"image": feature, "calibration": calibration},
-                       {"detections_2d": detections2d, "detections_2.5d": detections25d, "depth": depth})
-        loop_condition = infinite
+            feature_dict = None
+            label_dict = None
+            for i in range(10):
+                if not self.load_depth:
+                    feature_dict = {"image": feature, "calibration": calibration}
+                    label_dict = {"detections_2d": detections2d, "detections_2.5d": detections25d}
+                else:
+                    depth = imread(self.load_depth[filename])
+                    feature_dict = {"image": feature, "calibration": calibration}
+                    label_dict = {"detections_2d": detections2d, "detections_2.5d": detections25d, "depth": depth}
+
+                is_bad = False
+                if self.augment_data is not None:
+                    feature_dict, label_dict = self.augment_data(self.hyperparams, feature_dict, label_dict)
+                if self.preprocess_feature is not None:
+                    feature_dict, is_bad = self.preprocess_feature(self.hyperparams, feature_dict)
+                if self.preprocess_label is not None and not is_bad:
+                    label_dict, is_bad = self.preprocess_label(self.hyperparams, feature_dict, label_dict)
+                if not is_bad:
+                    break
+            features.append(feature_dict)
+            labels.append(label_dict)
+        input_tensor_order = sorted(list(features[0].keys()))
+        return {k: np.array([dic[k] for dic in features]) for k in input_tensor_order},\
+               {k: np.array([dic[k] for dic in labels]) for k in labels[0]}
 
 
-def kitti_detection(base_dir, phase, data_split=10, depth_mapping_file_path=None, depth_base_dir=None):
-    filenames = [f for f in os.listdir(os.path.join(base_dir, "training", "label_2")) if f.endswith(".txt")]
-    load_depth = False
-    if depth_mapping_file_path is not None and depth_base_dir is not None:
-        mappings = []
-        with open(depth_mapping_file_path, 'r') as myfile:
-            mappings = myfile.read().strip().split("\n")
-        load_depth = {}
-        for mapping in mappings:
-            same_files = mapping.split(" ")
-            for f in filenames:
-                if os.path.join("data_object_image_2", "training", "image_2", f.replace(".txt", ".png")) == same_files[1]:
-                    same_image_path = same_files[0]
-                    path_parts = same_image_path.split("/")
-                    drive = path_parts[1]
-                    image_name = path_parts[-1]
-                    depth_image_path = os.path.join(depth_base_dir, "train", drive, "proj_depth", "groundtruth", "image_02", image_name)
-                    load_depth[f] = depth_image_path
-
-    return _gen, (filenames, data_split, phase, base_dir, load_depth)
-
-
-def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, inline_plotting=False, img_path_prefix=None, min_tresh=0.5, steps=11, allowed_classes=None):
+def evaluate3d(predictor, prediction_2_detections, hyperparams, visualize=False, inline_plotting=False, img_path_prefix=None, min_tresh=0.5, steps=11, allowed_classes=None):
     if NO_IPYTHON:
         print("Inline plotting not availible. Could not find ipython clear_output")
         inline_plotting = False
     print("Loading Data.")
-    test_data = kitti_detection(base_dir, phase=PHASE_VALIDATION)
-    data_fn, data_params = test_data
-    data_gen = data_fn(data_params)
+    hyperparams.train.batch_size = 1  # Force batch size to 1
+    test_data = KittiDetection(hyperparams, phase=PHASE_VALIDATION)
     treshs = [min_tresh + i / float(steps - 1) * (1.0 - min_tresh) for i in range(steps)]
 
     recalls = {}
@@ -121,12 +160,13 @@ def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, in
         s_rs[tresh] = []
 
     print("Evaluating Samples")
-    i = 0
-    for feat, label in data_gen:
+    for i in range(len(test_data)):
+        feat, label = test_data[i]
+        feat = {k: feat[k][0] for k in list(feat.keys())}
+        label = {k: label[k][0] for k in list(label.keys())}
         if inline_plotting and i > 0:
             clear_output()
         print("Sample {}\r".format(i))
-        i += 1
         calib = feat["calibration"]
         gts = label["detections_2.5d"]
         if allowed_classes is not None:
@@ -206,7 +246,7 @@ def evaluate3d(predictor, prediction_2_detections, base_dir, visualize=False, in
                 if img_path_prefix is not None:
                     img_path = os.path.join(img_path_prefix, img_path)
                 plt.savefig(img_path)
-        
+
         if i > 0:
             plt.clf()
             plt.title("Recall Curve")
@@ -286,39 +326,3 @@ def _optimal_assign(preds, gts, projection_matrix, tresh=0.5):
             FN.append(b)
 
     return TP, FP, FN
-
-
-if __name__ == "__main__":
-    from opendatalake.texture_augmentation import full_texture_augmentation
-
-    print("Loading Dataset:")
-    train_data = None
-    depth_mode = False
-    if "--use_depth" in sys.argv:
-        depth_mode = True
-        train_data = kitti_detection("datasets/kitti_detection", phase=PHASE_TRAIN, depth_mapping_file_path="data/kitti_depth_to_raw.txt", depth_base_dir="datasets/kitti_depth")
-    else:
-        train_data = kitti_detection("datasets/kitti_detection", phase=PHASE_TRAIN)
-
-    data_fn, data_params = train_data
-    data_gen = data_fn(data_params)
-
-    for feat, label in data_gen:
-        fig = plt.figure(figsize=(24, 14), dpi=80)
-        if depth_mode:
-            fig.add_subplot(2, 1, 1)
-
-        plt.title("Image")
-        img = feat["image"].copy()
-        img = full_texture_augmentation(img)
-        for detection in label["detections_2.5d"]:
-            detection.visualize(img, color=(255, 0, 0), projection_matrix=feat["calibration"])
-        plt.imshow(img)
-
-        if depth_mode:
-            fig.add_subplot(2, 1, 2)
-            plt.title("Depth")
-            plt.imshow(label["depth"], cmap="jet")
-            #plt.colorbar()
-        plt.show()
-        plt.close(fig)

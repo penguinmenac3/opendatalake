@@ -1,44 +1,26 @@
-from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
 
+from tensorflow.examples.tutorials.mnist import input_data
 
-def _gen(params, stride=1, offset=0, infinite=False):
-    images, labels = params
-    loop_condition = True
-    while loop_condition:
-        for idx in range(offset, len(images), stride):
-            yield ({"image": images[idx]}, {"probs": labels[idx]})
-        loop_condition = infinite
+from opendatalake.simple_sequence import SimpleSequence
 
 
-def mnist(base_dir, phase, prepare_features=None):
-    _mnist = input_data.read_data_sets(base_dir, one_hot=True)
-    if phase == "test":
-        images = _mnist.test.images
-        labels = _mnist.test.labels
-    else:
-        images = _mnist.train.images
-        labels = _mnist.train.labels
+class MNIST(SimpleSequence):
+    def __init__(self, hyperparams, phase, preprocess_fn=None, augmentation_fn=None):
+        super(MNIST, self).__init__(hyperparams, phase, preprocess_fn, augmentation_fn)
+        _mnist = input_data.read_data_sets(hyperparams.problem.data_path, one_hot=True)
+        if phase == "validation":
+            images = _mnist.test.images
+            labels = _mnist.test.labels
+        else:
+            images = _mnist.train.images
+            labels = _mnist.train.labels
 
-    if prepare_features is not None:
-        images = prepare_features(images)
+        self.images = images
+        self.labels = labels
 
-    params = (images, labels)
+    def __num_samples(self):
+        return len(self.images)
 
-    return _gen, params
-
-
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    train_data = mnist("data/mnist", "train", lambda x: np.reshape(np.array(x), (-1, 28, 28)))
-
-    data_fn, data_params = train_data
-    data_gen = data_fn(data_params)
-
-    feature, label = next(data_gen)
-    print("Image shape:")
-    print(feature["image"].shape)
-
-    for feature, label in data_gen:
-        plt.imshow(feature["image"])
-        plt.show()
+    def __get_sample(self, idx):
+        return {"image": np.reshape(self.images[idx], (28, 28))}, {"probs": self.labels[idx]}

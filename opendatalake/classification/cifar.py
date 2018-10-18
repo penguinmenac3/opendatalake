@@ -2,6 +2,8 @@ import os
 import pickle
 import numpy as np
 
+from opendatalake.simple_sequence import SimpleSequence
+
 
 # Here the cifar data can be downloaded.
 CIFAR_10_DOWNLOAD = "https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz"
@@ -11,56 +13,39 @@ CIFAR_100_DOWNLOAD = "https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz"
 # For cifar-100 the data/cifar-100 folder should contain a train and a test file.
 
 
-def _gen(params, stride=1, offset=0, infinite=False):
-    images, labels = params
+class Cifar(SimpleSequence):
+    def __init__(self, hyperparams, phase, preprocess_fn=None, augmentation_fn=None):
+        super(Cifar, self).__init__(hyperparams, phase, preprocess_fn, augmentation_fn)
+        base_dir = self.hyperparams.problem.data_path
+        version = self.hyperparams.problem.get("version", 10)
 
-    loop_condition = True
-    while loop_condition:
-        for idx in range(offset, len(images), stride):
-            img = np.reshape(images[idx], (3, 32, 32))
-            yield ({"image": img.transpose((1, 2, 0))}, {"probs": labels[idx]})
-        loop_condition = infinite
+        self.images = []
+        self.labels = []
 
-
-def cifar(base_dir, phase, version=10):
-    images = []
-    labels = []
-
-    if version == 10:
-        if phase == "train":
-            for x in range(1,5,1):
-                data_path = os.path.join(base_dir, "data_batch_" + str(x))
+        if version == 10:
+            if phase == "train":
+                for x in range(1,5,1):
+                    data_path = os.path.join(base_dir, "data_batch_" + str(x))
+                    with open(data_path, 'rb') as fo:
+                        dict = pickle.load(fo, encoding='bytes')
+                        self.images.extend(dict[b"data"])
+                        self.labels.extend(dict[b"labels"])
+            if phase == "test":
+                data_path = os.path.join(base_dir, "test_batch")
                 with open(data_path, 'rb') as fo:
                     dict = pickle.load(fo, encoding='bytes')
-                    images.extend(dict[b"data"])
-                    labels.extend(dict[b"labels"])
-        if phase == "test":
-            data_path = os.path.join(base_dir, "test_batch")
+                    self.images.extend(dict[b"data"])
+                    self.labels.extend(dict[b"labels"])
+        if version == 100:
+            data_path = os.path.join(base_dir, phase)
             with open(data_path, 'rb') as fo:
                 dict = pickle.load(fo, encoding='bytes')
-                images.extend(dict[b"data"])
-                labels.extend(dict[b"labels"])
-    if version == 100:
-        data_path = os.path.join(base_dir, phase)
-        with open(data_path, 'rb') as fo:
-            dict = pickle.load(fo, encoding='bytes')
-            images.extend(dict[b"data"])
-            labels.extend(dict[b"fine_labels"])
+                self.images.extend(dict[b"data"])
+                self.labels.extend(dict[b"fine_labels"])
 
-    return _gen, (images, labels)
+    def __num_samples(self):
+        return len(self.images)
 
-
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    train_data = cifar("data/cifar-10", "train")
-
-    data_fn, data_params = train_data
-    data_gen = data_fn(data_params)
-
-    img, label = next(data_gen)
-    print("Image shape:")
-    print(img["image"].shape)
-
-    for img, label in data_gen:
-        plt.imshow(img["image"])
-        plt.show()
+    def __get_sample(self, idx):
+        img = np.reshape(self.images[idx], (3, 32, 32))
+        return ({"image": img.transpose((1, 2, 0))}, {"probs": self.labels[idx]})

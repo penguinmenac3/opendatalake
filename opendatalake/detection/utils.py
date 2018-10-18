@@ -62,7 +62,7 @@ class FusableDetection(object):
         h = 0
         l = 0
         theta_s = 0
-        theta_c = 1
+        theta_c = 0
         weights = 0
         max_conf = 0
 
@@ -175,9 +175,9 @@ class Detection(object):
 
 
 class Detection2d(Detection):
-    __slots__ = ["class_id", "cx", "cy", "w", "h", "theta", "conf"]
+    __slots__ = ["class_id", "cx", "cy", "w", "h", "theta", "conf", "instance_mask"]
 
-    def __init__(self, class_id, cx, cy, w, h, theta=0.0, conf=0):
+    def __init__(self, class_id, cx, cy, w, h, theta=0.0, conf=0, instance_mask=None):
         self.class_id = class_id
         self.conf = conf
         self.cx = cx
@@ -185,13 +185,22 @@ class Detection2d(Detection):
         self.w = abs(w)
         self.h = abs(h)
         self.theta = theta
+        self.instance_mask = instance_mask
 
     def move_image(self, dx, dy):
         self.cx = self.cx - dx
         self.cy = self.cy - dy
+        if self.instance_mask is not None:
+            self.instance_mask = list(self.instance_mask)
+            for j in range(len(self.instance_mask)):
+                self.instance_mask[j] = list(self.instance_mask[j])
+                for i in range(int(len(self.instance_mask[j]) / 2)):
+                    if type(self.instance_mask[j][2 * i + 0]) != str:
+                        self.instance_mask[j][2 * i + 0] = self.instance_mask[j][2 * i + 0] - dx
+                        self.instance_mask[j][2 * i + 1] = self.instance_mask[j][2 * i + 1] - dy
 
     def copy(self):
-        return Detection2d(self.class_id, self.cx, self.cy, self.w, self.h, self.theta, self.conf)
+        return Detection2d(self.class_id, self.cx, self.cy, self.w, self.h, self.theta, self.conf, self.instance_mask)
 
     def iou(self, other):
         # Calculate edges of intersection area
@@ -220,14 +229,53 @@ class Detection2d(Detection):
         return intersection_area / float(union)
 
     def to_array(self):
-        return [self.class_id, self.cx, self.cy, self.w, self.h, self.theta, self.conf]
+        return [self.class_id, self.cx, self.cy, self.w, self.h, self.theta, self.conf, self.instance_mask]
 
-    def visualize(self, image, color):
+    def create_instance_mask(self, image_shape, color=255):
+        mask = np.zeros(image_shape)
+        cv2.fillPoly(mask, self._instance_mask_to_cv_pts(), color)
+        return mask
+
+    def _instance_mask_to_cv_pts(self):
+        c = len(self.instance_mask)
+        polys = []
+        for poly in self.instance_mask:
+            pts = []
+            for i in range(int(len(poly)/ 2)):
+                if type(poly[2 * i + 0]) != str:
+                    pt = (int(poly[2 * i + 0]), int(poly[2 * i + 1]))
+                    pts.append(pt)
+
+            if len(pts) > 0:
+                polys.append(np.array(pts))
+        return polys
+
+    def visualize(self, image, color=None, color_map=None, class_id_map=None):
+        if color is None and color_map is None:
+            return
+        if color is None:
+            color = color_map[self.class_id]
         cv2.rectangle(image,
                       (int(self.cx - self.w / 2.0), int(self.cy - self.h / 2.0)),
                       (int(self.cx + self.w / 2.0), int(self.cy + self.h / 2.0)),
                       (color[0], color[1], color[2]),
                       thickness=2)
+        class_name = self.class_id
+        if class_id_map is not None:
+            class_name = class_id_map[self.class_id]
+        cv2.putText(image,
+                    "{}".format(class_name),
+                    (int(self.cx - self.w / 2.0), int(self.cy - self.h / 2.0 - 3)),
+                    cv2.FONT_HERSHEY_PLAIN,
+                    1.0,
+                    (color[0], color[1], color[2]),
+                    1)
+        if self.instance_mask is not None:
+            pts = self._instance_mask_to_cv_pts()
+            overlay = image.copy()
+            cv2.fillPoly(overlay, pts, (color[0], color[1], color[2]))
+            alpha = 0.5
+            cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
 
 
 class Detection25d(Detection):
@@ -733,8 +781,7 @@ def move_detections(label, dy, dx):
         if k.startswith("detection"):
             detections = label[k]
             for detection in detections:
-                detection.cy += dy
-                detection.cx += dx
+                detection.move_image(-dx, -dy)
 
 
 def hflip_detections(label, w):
@@ -828,17 +875,31 @@ def augment_detections(hyper_params, feature, label):
 
         move_detections(augmented_label, -dy, -dx)
 
-    if hyper_params.problem.augmentation.get("random_crop", None) is not None and len(augmented_label["detections_2d"]) != 0:
+    if hyper_params.problem.augmentation.get("random_crop", None) is not None:
         img_h, img_w, img_c = augmented_feature["image"].shape
         target_w = hyper_params.problem.augmentation.random_crop.shape.width
         target_h = hyper_params.problem.augmentation.random_crop.shape.height
 
-        idx = random.randint(0, len(augmented_label["detections_2d"]) - 1)
-        detection = augmented_label["detections_2d"][idx]
+        delta_x = max(int(math.ceil((target_w + 1 - img_w) / 2)), 0)
+        delta_y = max(int(math.ceil((target_h + 1 - img_h) / 2)), 0)
+        move_detections(augmented_label, delta_y, delta_x)
+        augmented_feature["image"] = cv2.copyMakeBorder(augmented_feature["image"],
+                                                        delta_y, delta_y, delta_x, delta_x,
+                                                        cv2.BORDER_CONSTANT)
+        img_h, img_w, img_c = augmented_feature["image"].shape
+
+        start_x = 0
+        start_y = 0
+        if len(augmented_label["detections_2d"]) != 0:
+            idx = random.randint(0, len(augmented_label["detections_2d"]) - 1)
+            detection = augmented_label["detections_2d"][idx]
+            start_x = int(detection.cx - random.random() * (target_w - 20) / 2.0 - 10)
+            start_y = int(detection.cy - random.random() * (target_h - 20) / 2.0 - 10)
+        else:
+            start_x = int(img_w * random.random())
+            start_y = int(img_h * random.random())
 
         # Compute start point so that crop fit's into image and random crop contains detection
-        start_x = int(detection.cx - random.random() * (target_w - 20) / 2.0 - 10)
-        start_y = int(detection.cy - random.random() * (target_h - 20) / 2.0 - 10)
         if start_x < 0:
             start_x = 0
         if start_y < 0:
