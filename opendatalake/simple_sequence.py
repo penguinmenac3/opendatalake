@@ -32,7 +32,7 @@ class SimpleSequence(Sequence):
         features = []
         labels = []
         batch_size = self.hyperparams.train.get("batch_size", 1)
-        for idx in range(index * batch_size, min((index + 1) * batch_size, len(self.images))):
+        for idx in range(index * batch_size, min((index + 1) * batch_size, self.__num_samples())):
             feature, label = self.__get_sample(idx)
             if self.augmentation_fn is not None:
                 feature, label = self.augmentation_fn(self.hyperparams, feature, label)
