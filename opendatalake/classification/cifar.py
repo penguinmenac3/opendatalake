@@ -43,9 +43,9 @@ class Cifar(SimpleSequence):
                 self.images.extend(dict[b"data"])
                 self.labels.extend(dict[b"fine_labels"])
 
-    def __num_samples(self):
+    def num_samples(self):
         return len(self.images)
 
-    def __get_sample(self, idx):
+    def get_sample(self, idx):
         img = np.reshape(self.images[idx], (3, 32, 32))
         return ({"image": img.transpose((1, 2, 0))}, {"probs": self.labels[idx]})

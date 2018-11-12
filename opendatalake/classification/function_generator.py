@@ -13,10 +13,10 @@ class FunctionGenerator(SimpleSequence):
         self.sequence_length = hyperparams.problem.sequence_length
         self.samples_per_epoch = hyperparams.problem.samples_per_epoch
 
-    def __num_samples(self):
+    def num_samples(self):
         return self.samples_per_epoch
 
-    def __get_sample(self, idx):
+    def get_sample(self, idx):
         label_idx = randint(0, self.num_functions - 1)
         offset = random()
         selected_function = self.functions[label_idx]

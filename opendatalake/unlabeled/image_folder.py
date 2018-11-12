@@ -7,7 +7,7 @@ from opendatalake.utils import crop_center
 
 
 class UnlabeledImageFolder(SimpleSequence):
-    def __init__(self, hyperparams, phase, preprocess_fn=None, augmentation_fn=None, overwrite_cache=False):
+    def __init__(self, hyperparams, phase, preprocess_fn=None, augmentation_fn=None):
         super(UnlabeledImageFolder, self).__init__(hyperparams, phase, preprocess_fn, augmentation_fn)
 
         self.base_dir = self.hyperparams.problem.data_path
@@ -20,27 +20,15 @@ class UnlabeledImageFolder(SimpleSequence):
             data_dir = self.base_dir
         self.images = []
 
-        if overwrite_cache:
-            if os.path.exists(os.path.join(data_dir, "images.json")):
-                os.remove(os.path.join(data_dir, "images.json"))
+        for filename in os.listdir(data_dir):
+            if filename.endswith(file_extension):
+                self.images.append(os.path.join(data_dir, filename))
 
-        if os.path.exists(os.path.join(data_dir, "images.json")):
-            print("Using buffer files.")
-            with open(os.path.join(data_dir, "images.json"), 'r') as infile:
-                self.images = json.load(infile)
-        else:
-            print("No buffer files found. Reading folder structure and creating buffer files.")
-            for filename in os.listdir(data_dir):
-                if filename.endswith(file_extension):
-                    self.images.append(os.path.join(data_dir, filename))
 
-            with open(os.path.join(data_dir, "images.json"), 'w') as outfile:
-                json.dump(self.images, outfile)
-
-    def __num_samples(self):
+    def num_samples(self):
         return len(self.images)
 
-    def __get_sample(self, idx):
+    def get_sample(self, idx):
         feature = imread(self.images[idx], mode="RGB")
         if self.crop_roi is not None:
             feature = crop_center(feature, self.crop_roi[0], self.crop_roi[1])

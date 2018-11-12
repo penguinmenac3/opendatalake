@@ -19,8 +19,8 @@ class MNIST(SimpleSequence):
         self.images = images
         self.labels = labels
 
-    def __num_samples(self):
+    def num_samples(self):
         return len(self.images)
 
-    def __get_sample(self, idx):
+    def get_sample(self, idx):
         return {"image": np.reshape(self.images[idx], (28, 28))}, {"probs": self.labels[idx]}

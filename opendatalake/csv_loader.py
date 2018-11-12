@@ -14,19 +14,8 @@ class CSV(SimpleSequence):
         self.features = df.loc[:, feature_name_list].values
         self.labels = df.loc[:, label_name_list].values
 
-    def __num_samples(self):
-        return len(features)
+    def num_samples(self):
+        return len(self.features)
 
-    def __get_sample(self, idx):
-        return {"feature": features[idx]}, {"label": labels[idx]}
-
-
-if __name__ == "__main__":
-    print("Loading Dataset:")
-    # Random csv-dataset from kaggle: https://www.kaggle.com/iliassekkaf/computerparts
-    gen, params = load_csv("data/computer_parts/All_GPUs.csv", feature_name_list=["Manufacturer", "Memory"], label_name_list=["Name"])
-    train_data = gen(params)
-
-    feature, label = next(train_data)
-    print(feature["feature"])
-    print(label["label"])
+    def get_sample(self, idx):
+        return {"feature": self.features[idx]}, {"label": self.labels[idx]}

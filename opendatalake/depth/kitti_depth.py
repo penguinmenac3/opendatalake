@@ -25,10 +25,10 @@ class KittiDepth(SimpleSequence):
         self.file_objs = file_objs
         self.base_dir = base_dir
 
-    def __num_samples(self):
+    def num_samples(self):
         return len(self.file_objs)
 
-    def __get_sample(self, idx):
+    def get_sample(self, idx):
         filename = self.file_objs[idx]["filename"]
         drive = self.file_objs[idx]["drive"]
         image = os.path.join(self.base_dir, self.phase, drive, "proj_depth", "groundtruth", "image_02", filename)

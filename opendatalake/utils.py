@@ -8,6 +8,8 @@ def one_hot(idx, max_idx):
 
 def crop_center(img, cropy, cropx):
     y, x, _ = img.shape
+    assert x > cropx
+    assert y > cropy
     startx = x//2-(cropx//2)
     starty = y//2-(cropy//2)
     return img[starty:starty+cropy, startx:startx+cropx, :]
