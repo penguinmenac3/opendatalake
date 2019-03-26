@@ -40,5 +40,6 @@ class SimpleSequence(tf.keras.utils.Sequence):
                 feature, label = self.preprocess_fn(self.hyperparams, feature, label)
             features.append(feature)
             labels.append(label)
-        return {k: array([dic[k] for dic in features]) for k in features[0]},\
+        input_tensor_order = sorted(list(features[0].keys()))
+        return {k: array([dic[k] for dic in features]) for k in input_tensor_order},\
                {k: array([dic[k] for dic in labels]) for k in labels[0]}
