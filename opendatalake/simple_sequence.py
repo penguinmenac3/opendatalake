@@ -1,9 +1,9 @@
 from math import ceil
 from numpy import array
-from keras.utils import Sequence
+import tensorflow as tf
 
 
-class SimpleSequence(Sequence):
+class SimpleSequence(tf.keras.utils.Sequence):
     """
     This simple sequence makes implementing keras sequences in the correct way far simpler.
 
